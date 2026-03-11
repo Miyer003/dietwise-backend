@@ -1,98 +1,111 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 膳智 DietWise 后端服务
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+基于 NestJS + TypeScript + PostgreSQL + Redis 的智能膳食管理系统后端。
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 技术栈
 
-## Description
+- **框架**: NestJS 10
+- **语言**: TypeScript 5
+- **数据库**: PostgreSQL 15 + TypeORM
+- **缓存**: Redis 7
+- **对象存储**: MinIO (兼容 S3)
+- **AI服务**: 
+  - 阿里云 DashScope (qwen-vl-plus / qwen-turbo)
+  - Moonshot (kimi-v1)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 功能模块
 
-## Project setup
+| 模块 | 说明 |
+|------|------|
+| 认证模块 | JWT登录、注册、短信验证码 |
+| 用户模块 | 用户信息、用户画像、身体数据 |
+| 饮食记录 | 多模态记录(拍照/语音/手动)、营养分析 |
+| 食物库 | 标准食物数据、搜索、语义检索 |
+| 食谱规划 | AI生成一周食谱、自定义食谱 |
+| AI咨询 | 多轮对话、SSE流式响应 |
+| 提醒设置 | 餐次提醒、饮水提醒 |
+| 自定义提示 | 首页个性化提示管理 |
+| 成就徽章 | 打卡成就、营养成就 |
+| 用户反馈 | 问题反馈、建议提交 |
+| 数据同步 | 离线数据同步 |
+| 管理后台 | 用户管理、数据统计 |
 
-```bash
-$ npm install
-```
+## 快速开始
 
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+### 1. 安装依赖
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. 配置环境变量
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+cp .env.example .env
+# 编辑 .env 文件配置你的数据库、Redis、AI密钥等
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 3. 启动依赖服务
 
-## Resources
+确保 PostgreSQL、Redis、MinIO 已启动。
 
-Check out a few resources that may come in handy when working with NestJS:
+### 4. 运行开发服务器
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+npm run start:dev
+```
 
-## Support
+服务将启动在 http://localhost:3000
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+API文档: http://localhost:3000/api-docs
 
-## Stay in touch
+### 5. 生产构建
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+npm run build
+npm run start:prod
+```
+
+## 项目结构
+
+```
+src/
+├── modules/           # 业务模块
+│   ├── auth/         # 认证
+│   ├── user/         # 用户
+│   ├── diet/         # 饮食记录
+│   ├── food/         # 食物库
+│   ├── meal-plan/    # 食谱规划
+│   ├── chat/         # AI咨询
+│   ├── notification/ # 提醒设置
+│   ├── tips/         # 自定义提示
+│   ├── achievement/  # 成就徽章
+│   ├── feedback/     # 用户反馈
+│   ├── sync/         # 数据同步
+│   ├── admin/        # 管理后台
+│   └── ai/           # AI服务接口
+├── shared/           # 共享服务
+│   ├── ai/          # AI服务封装
+│   ├── redis/       # Redis服务
+│   └── minio/       # MinIO服务
+├── common/          # 公共工具
+├── config/          # 配置文件
+└── main.ts          # 入口文件
+```
+
+## API 设计
+
+- 基础路径: `/v1`
+- 认证方式: Bearer JWT Token
+- 响应格式: 统一包装 `{ code, message, data, timestamp, requestId }`
+
+## 开发规范
+
+1. 使用装饰器进行参数验证 (class-validator)
+2. 统一使用 Swagger 注解生成 API 文档
+3. 数据库实体使用 TypeORM 装饰器
+4. 缓存键遵循规范: `模块:操作:标识`
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT
