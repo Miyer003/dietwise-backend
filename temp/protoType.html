@@ -1,0 +1,2952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>膳智 DietWise - APP原型</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        /* 手机外框 */
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #000;
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: #F8F9FA;
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 状态栏 */
+        .status-bar {
+            height: 44px;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #000;
+            z-index: 50;
+        }
+        
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            background: #F8F9FA;
+        }
+        
+        .content-area::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* 页面切换动画 */
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+            padding-bottom: 90px;
+            min-height: 100%;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 环形进度条 */
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        
+        /* Tab栏 */
+        .tab-bar {
+            height: 84px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #E8E8E8;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 8px;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            z-index: 100;
+            padding-bottom: 20px;
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 12px;
+            border-radius: 12px;
+            color: #9CA3AF;
+        }
+        
+        .tab-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .tab-item.active {
+            color: #10B981;
+        }
+        
+        .tab-item.active svg {
+            stroke: #10B981;
+            fill: #10B981;
+        }
+        
+        /* 中间凸起按钮 */
+        .fab-button {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: -20px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            border: 4px solid #F8F9FA;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .fab-button:active {
+            transform: scale(0.95);
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+            transition: all 0.2s;
+        }
+        
+        .card:active {
+            transform: scale(0.98);
+        }
+        
+        /* 进度条 */
+        .progress-bar {
+            height: 8px;
+            background: #E5E7EB;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* 聊天气泡 */
+        .chat-bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            margin: 6px 0;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        
+        .chat-left {
+            background: white;
+            color: #1F2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        }
+        
+        .chat-right {
+            background: #10B981;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        /* 时间线 */
+        .timeline-item {
+            position: relative;
+            padding-left: 24px;
+            border-left: 2px solid #E5E7EB;
+            margin-left: 8px;
+            padding-bottom: 16px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 4px;
+            width: 8px;
+            height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        
+        .timeline-item:last-child {
+            border-left: 2px solid transparent;
+        }
+        
+        /* 输入框样式 */
+        .input-field {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        .input-field:focus {
+            border-color: #10B981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        
+        /* 标签 */
+        .tag {
+            display: inline-block;
+            padding: 6px 14px;
+            background: #ECFDF5;
+            color: #059669;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .tag:hover {
+            background: #D1FAE5;
+        }
+        
+        .tag.active {
+            background: #10B981;
+            color: white;
+        }
+        
+        /* 徽章 */
+        .badge {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .badge.locked {
+            background: #E5E7EB;
+            filter: grayscale(100%);
+        }
+        
+        /* 分段控制器 */
+        .segment-control {
+            display: flex;
+            background: #F3F4F6;
+            border-radius: 10px;
+            padding: 4px;
+        }
+        
+        .segment-item {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: #6B7280;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .segment-item.active {
+            background: white;
+            color: #10B981;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* 快捷入口网格 */
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            padding: 0 16px;
+        }
+        
+        .quick-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 12px 4px;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        
+        .quick-item:active {
+            background: #F3F4F6;
+            transform: scale(0.95);
+        }
+        
+        .quick-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        /* 统计卡片 */
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        
+        /* 趋势图 */
+        .trend-bar {
+            width: 100%;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        /* 导航头部 */
+        .page-header {
+            background: white;
+            padding: 12px 16px;
+            border-bottom: 1px solid #F3F4F6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone-frame">
+    <div class="phone-screen">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span>9:41</span>
+            <div class="flex gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="content-area" id="contentArea">
+            
+            <!-- 首页 -->
+            <div class="page active" id="page-home">
+                <!-- 顶部问候和日期 -->
+                <div class="bg-white px-5 pt-5 pb-4 rounded-b-3xl shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm">3月6日 星期四</p>
+                            <h1 class="text-2xl font-bold text-gray-800 mt-1">早上好，User 👋</h1>
+                        </div>
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-xl cursor-pointer hover:bg-green-200 transition-colors" onclick="switchTab('profileEdit')">
+                            😊
+                        </div>
+                    </div>
+                    
+                    <!-- 环形进度图 -->
+                    <div class="flex justify-center my-5">
+                        <div class="relative w-40 h-40">
+                            <svg class="progress-ring w-full h-full" viewBox="0 0 120 120">
+                                <circle class="text-gray-100" stroke-width="10" stroke="currentColor" fill="transparent" r="50" cx="60" cy="60"/>
+                                <circle class="progress-ring-circle text-green-500" stroke-width="10" stroke-linecap="round" stroke="currentColor" fill="transparent" r="50" cx="60" cy="60" 
+                                    stroke-dasharray="314.16" stroke-dashoffset="109.96"/>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-3xl font-bold text-gray-800">1,250</span>
+                                <span class="text-xs text-gray-400 mt-0.5">/ 2,000 kcal</span>
+                                <span class="text-sm font-medium text-green-600 mt-1">65%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 营养进度条 -->
+                    <div class="space-y-3 px-1">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600 flex items-center gap-1">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>蛋白质
+                                </span>
+                                <span class="text-gray-700 font-medium">80g / 100g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-green-500" style="width: 80%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600 flex items-center gap-1">
+                                    <span class="w-2 h-2 bg-yellow-500 rounded-full"></span>碳水
+                                </span>
+                                <span class="text-gray-700 font-medium">180g / 300g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-yellow-500" style="width: 60%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600 flex items-center gap-1">
+                                    <span class="w-2 h-2 bg-orange-500 rounded-full"></span>脂肪
+                                </span>
+                                <span class="text-gray-700 font-medium">32g / 80g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-orange-500" style="width: 40%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI智能建议卡片 -->
+                <div class="px-4 mt-5">
+                    <div class="card bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 border border-green-100">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-xl flex-shrink-0 shadow-lg shadow-green-200">
+                                🤖
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-semibold text-gray-800">AI营养顾问建议</h3>
+                                    <span class="text-xs text-gray-400">2分钟前</span>
+                                </div>
+                                <p class="text-gray-600 text-sm mt-2 leading-relaxed">
+                                    今日蛋白质摄入充足，晚餐建议增加绿叶蔬菜摄入。您已连续3天蔬菜摄入不足，建议明天早餐增加一份水果。
+                                </p>
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="switchTab('chat')" class="flex-1 bg-green-500 text-white text-sm font-medium py-2 rounded-xl shadow-sm hover:bg-green-600 transition-colors">
+                                        咨询AI →
+                                    </button>
+                                    <button onclick="switchTab('analytics')" class="px-4 bg-white text-green-600 text-sm font-medium py-2 rounded-xl border border-green-200 hover:bg-green-50 transition-colors">
+                                        详情
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 今日记录时间线 -->
+                <div class="px-4 mt-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-bold text-gray-800">📋 今日记录</h2>
+                        <button onclick="switchTab('analytics')" class="text-sm text-gray-500 hover:text-green-600 transition-colors">
+                            查看全部 →
+                        </button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="timeline-item">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+                                    🍳
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="font-semibold text-gray-800">早餐</h3>
+                                        <span class="text-xs text-gray-400">08:30</span>
+                                    </div>
+                                    <p class="text-gray-500 text-sm mt-0.5">包子 + 豆浆</p>
+                                    <p class="text-orange-600 font-medium text-sm mt-1">450 kcal</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+                                    🍣
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="font-semibold text-gray-800">午餐</h3>
+                                        <span class="text-xs text-gray-400">12:15</span>
+                                    </div>
+                                    <p class="text-gray-500 text-sm mt-0.5">红烧肉饭</p>
+                                    <p class="text-red-600 font-medium text-sm mt-1">800 kcal</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start gap-3 pl-1">
+                            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 border-2 border-dashed border-gray-300">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </div>
+                            <div class="flex-1 py-2" onclick="switchTab('record')">
+                                <p class="text-gray-400 text-sm">点击添加晚餐记录...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI随机建议 / 用户自定义提示 -->
+                <div class="px-4 mt-4 mb-6">
+                    <div class="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100" id="dailyTipCard">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🤖</span>
+                                <span class="font-semibold text-blue-800 text-sm" id="tipTypeLabel">AI 智能建议</span>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="refreshTip()" class="p-1.5 hover:bg-blue-100 rounded-full transition-colors" title="刷新">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-600">
+                                        <polyline points="23 4 23 10 17 10"></polyline>
+                                        <polyline points="1 20 1 14 7 14"></polyline>
+                                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="switchTab('tipLibrary')" class="p-1.5 hover:bg-blue-100 rounded-full transition-colors" title="管理提示">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-600">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-blue-700 text-sm leading-relaxed" id="dailyTipText">根据您近期的饮食数据，蔬菜摄入量较低，建议今晚增加一份清炒时蔬。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记录页 -->
+            <div class="page" id="page-record">
+                <div class="bg-white p-5 rounded-b-3xl shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('home')" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">添加记录</h1>
+                            <p class="text-gray-500 text-sm">选择记录方式</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-4 mt-6 space-y-3">
+                    <!-- 拍照 -->
+                    <div class="card p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg transition-all" onclick="showToast('调用相机识别...')">
+                        <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-blue-200">
+                            📷
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 text-lg">拍照识菜</h3>
+                            <p class="text-gray-500 text-sm mt-0.5">AI识别菜品并估算热量</p>
+                        </div>
+                        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 语音 -->
+                    <div class="card p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg transition-all" onclick="showToast('开始语音输入...')">
+                        <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-purple-200">
+                            🎤
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 text-lg">语音速记</h3>
+                            <p class="text-gray-500 text-sm mt-0.5">按住说话，自动解析食物名称</p>
+                        </div>
+                        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 手动 -->
+                    <div class="card p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg transition-all" onclick="showToast('进入食物搜索...')">
+                        <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-green-200">
+                            ⌨️
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 text-lg">手动输入</h3>
+                            <p class="text-gray-500 text-sm mt-0.5">搜索食物库，精确记录分量</p>
+                        </div>
+                        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最近常吃 -->
+                <div class="px-4 mt-6">
+                    <h3 class="text-sm font-medium text-gray-500 mb-3">最近常吃 • 点击快速添加</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="tag active cursor-pointer">🍚 米饭</span>
+                        <span class="tag cursor-pointer">🥚 鸡蛋</span>
+                        <span class="tag cursor-pointer">🥛 牛奶</span>
+                        <span class="tag cursor-pointer">🥩 鸡胸肉</span>
+                        <span class="tag cursor-pointer">🍎 苹果</span>
+                        <span class="tag cursor-pointer">🥬 西兰花</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析页 - 日页面 -->
+            <div class="page" id="page-analytics">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">饮食分析</h1>
+                            <p class="text-gray-500 text-sm mt-0.5">今日数据详情</p>
+                        </div>
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                            📊
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 时间维度导航 -->
+                <div class="px-4 mt-4">
+                    <div class="segment-control">
+                        <div class="segment-item active" onclick="switchAnalyticsTab('analytics')">今日</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('week')">本周</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('month')">本月</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('history')">历史</div>
+                    </div>
+                </div>
+
+                <!-- 今日概览 -->
+                <div class="grid grid-cols-3 gap-3 px-4 mt-4">
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">1,250</p>
+                        <p class="text-xs text-gray-500 mt-0.5">今日摄入</p>
+                        <p class="text-xs text-green-600 mt-1">剩余 750</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">2</p>
+                        <p class="text-xs text-gray-500 mt-0.5">已记录餐次</p>
+                        <p class="text-xs text-gray-400 mt-1">目标 3餐</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-green-600">85</p>
+                        <p class="text-xs text-gray-500 mt-0.5">健康评分</p>
+                        <p class="text-xs text-green-600 mt-1">优秀</p>
+                    </div>
+                </div>
+
+                <!-- 营养成分分析（详细版） -->
+                <div class="card mt-4">
+                    <h3 class="font-bold text-gray-800 mb-4">🥜 营养成分分析</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-700">蛋白质</span>
+                                <span class="text-sm font-medium text-gray-800">80g / 100g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-green-500" style="width: 80%"></div>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">主要来源：包子、红烧肉</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-700">碳水化合物</span>
+                                <span class="text-sm font-medium text-gray-800">180g / 300g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-yellow-500" style="width: 60%"></div>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">主要来源：米饭、面包</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-700">脂肪</span>
+                                <span class="text-sm font-medium text-gray-800">32g / 80g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-orange-500" style="width: 40%"></div>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">主要来源：红烧肉饭</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-700">膳食纤维</span>
+                                <span class="text-sm font-medium text-red-500">8g / 25g</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-red-500" style="width: 32%"></div>
+                            </div>
+                            <p class="text-xs text-red-400 mt-1">摄入不足，建议增加蔬菜</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-700">维生素C</span>
+                                <span class="text-sm font-medium text-yellow-600">45mg / 100mg</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-yellow-400" style="width: 45%"></div>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">主要来源：豆浆</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 今日餐次记录详情 -->
+                <div class="px-4 mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">🍽️ 今日餐次记录</h3>
+                    <div class="space-y-3">
+                        <div class="card py-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-xl">🍳</div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">早餐 08:30</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">包子 + 豆浆</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-orange-600">450</p>
+                                    <p class="text-xs text-gray-400">kcal</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-100 flex gap-4 text-xs text-gray-500">
+                                <span>蛋白质 15g</span>
+                                <span>碳水 65g</span>
+                                <span>脂肪 8g</span>
+                            </div>
+                        </div>
+
+                        <div class="card py-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-xl">🍣</div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">午餐 12:15</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">红烧肉饭</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-red-600">800</p>
+                                    <p class="text-xs text-gray-400">kcal</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-100 flex gap-4 text-xs text-gray-500">
+                                <span>蛋白质 35g</span>
+                                <span>碳水 85g</span>
+                                <span>脂肪 22g</span>
+                            </div>
+                        </div>
+
+                        <div class="card py-3 border-2 border-dashed border-gray-200" onclick="switchTab('record')">
+                            <div class="flex items-center justify-center gap-2 text-gray-400">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span class="text-sm">添加晚餐记录</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 今日AI建议 -->
+                <div class="card mt-4 mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-green-800 mb-1">今日饮食建议</h4>
+                            <p class="text-green-700 text-sm leading-relaxed">
+                                您今日的蛋白质摄入充足，但蔬菜摄入明显不足。建议晚餐选择清炒时蔬或沙拉，补充膳食纤维和维生素。
+                            </p>
+                            <button onclick="switchTab('chat')" class="mt-2 text-green-600 text-sm font-medium flex items-center gap-1">
+                                咨询AI获取晚餐建议 →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析页 - 周页面 -->
+            <div class="page" id="page-week">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">饮食分析</h1>
+                            <p class="text-gray-500 text-sm mt-0.5">本周数据概览</p>
+                        </div>
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                            📊
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 时间维度导航 -->
+                <div class="px-4 mt-4">
+                    <div class="segment-control">
+                        <div class="segment-item" onclick="switchAnalyticsTab('analytics')">今日</div>
+                        <div class="segment-item active" onclick="switchAnalyticsTab('week')">本周</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('month')">本月</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('history')">历史</div>
+                    </div>
+                </div>
+
+                <!-- 本周概览 -->
+                <div class="grid grid-cols-3 gap-3 px-4 mt-4">
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">1,785</p>
+                        <p class="text-xs text-gray-500 mt-0.5">平均日摄入</p>
+                        <p class="text-xs text-green-600 mt-1">合理范围</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">82</p>
+                        <p class="text-xs text-gray-500 mt-0.5">周健康评分</p>
+                        <p class="text-xs text-green-600 mt-1">良好</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">5/7</p>
+                        <p class="text-xs text-gray-500 mt-0.5">合规天数</p>
+                        <p class="text-xs text-yellow-600 mt-1">达标率 71%</p>
+                    </div>
+                </div>
+
+                <!-- 营养均衡度雷达图 -->
+                <div class="card mt-4">
+                    <h3 class="font-bold text-gray-800 mb-4 text-center">🎯 本周营养均衡度</h3>
+                    <div class="relative w-44 h-44 mx-auto">
+                        <svg viewBox="0 0 200 200" class="w-full h-full">
+                            <polygon points="100,20 180,60 180,140 100,180 20,140 20,60" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon points="100,40 160,70 160,130 100,160 40,130 40,70" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon points="100,60 140,80 140,120 100,140 60,120 60,80" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon fill="rgba(16, 185, 129, 0.2)" stroke="#10B981" stroke-width="2" points="100,35 165,70 175,125 100,165 35,125 30,70"/>
+                            <text x="100" y="15" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">蛋白质</text>
+                            <text x="190" y="55" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">碳水</text>
+                            <text x="190" y="145" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">脂肪</text>
+                            <text x="100" y="195" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">维生素</text>
+                            <text x="10" y="145" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">膳食纤维</text>
+                            <text x="10" y="55" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">矿物质</text>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-green-600">82</div>
+                                <div class="text-xs text-gray-500">本周评分</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 每日热量趋势（7天） -->
+                <div class="card mt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800">📈 每日热量趋势</h3>
+                        <span class="text-xs text-gray-400">3月1日-3月7日</span>
+                    </div>
+                    <div class="h-44 flex items-end justify-between gap-2">
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-100 rounded-t-lg relative cursor-pointer hover:bg-green-200 transition-colors" style="height: 55%" onclick="showDayDetail('3月1日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1650</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周1</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-200 rounded-t-lg relative cursor-pointer hover:bg-green-300 transition-colors" style="height: 70%" onclick="showDayDetail('3月2日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1950</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周2</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-500 rounded-t-lg relative cursor-pointer hover:bg-green-600 transition-colors" style="height: 45%" onclick="showDayDetail('3月3日')">
+                                <div class="absolute -top-5 w-full text-center text-xs font-bold text-white">1350</div>
+                            </div>
+                            <span class="text-xs text-gray-600 font-medium">周3</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-200 rounded-t-lg relative cursor-pointer hover:bg-green-300 transition-colors" style="height: 75%" onclick="showDayDetail('3月4日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">2100</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周4</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-yellow-200 rounded-t-lg relative cursor-pointer hover:bg-yellow-300 transition-colors" style="height: 85%" onclick="showDayDetail('3月5日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">2400</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周5</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-200 rounded-t-lg relative cursor-pointer hover:bg-green-300 transition-colors" style="height: 50%" onclick="showDayDetail('3月6日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1500</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周6</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-300 rounded-t-lg relative cursor-pointer hover:bg-green-400 transition-colors" style="height: 40%" onclick="showDayDetail('3月7日')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1200</div>
+                            </div>
+                            <span class="text-xs text-gray-400">周7</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 每日数据入口 -->
+                <div class="px-4 mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">📅 本周每日数据</h3>
+                    <div class="space-y-2">
+                        <div class="card py-3" onclick="showDayDetail('3月7日')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">今天 • 3月7日</p>
+                                        <p class="text-xs text-gray-500">2餐记录</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">1,250</p>
+                                    <p class="text-xs text-gray-400">kcal</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showDayDetail('3月6日')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">昨天 • 3月6日</p>
+                                        <p class="text-xs text-gray-500">3餐记录</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">1,750</p>
+                                    <p class="text-xs text-gray-400">kcal</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showDayDetail('3月5日')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">周五 • 3月5日</p>
+                                        <p class="text-xs text-red-500">超标</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-red-600">2,400</p>
+                                    <p class="text-xs text-gray-400">kcal</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="w-full mt-3 py-2 text-sm text-gray-500 hover:text-green-600 transition-colors">
+                        查看更多 ↓
+                    </button>
+                </div>
+
+                <!-- 本周AI分析 -->
+                <div class="card mt-4 mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-blue-800 mb-1">本周饮食分析</h4>
+                            <p class="text-blue-700 text-sm leading-relaxed">
+                                本周整体饮食较为健康，但周五热量摄入明显超标。建议下周控制高油腻食物的摄入，并保持蔬菜摄入的稳定性。您的蛋白质摄入一直保持得很好，请继续保持！
+                            </p>
+                            <button onclick="switchTab('chat')" class="mt-2 text-blue-600 text-sm font-medium flex items-center gap-1">
+                                咨询下周饮食建议 →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析页 - 月页面 -->
+            <div class="page" id="page-month">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">饮食分析</h1>
+                            <p class="text-gray-500 text-sm mt-0.5">3月数据概览</p>
+                        </div>
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                            📊
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 时间维度导航 -->
+                <div class="px-4 mt-4">
+                    <div class="segment-control">
+                        <div class="segment-item" onclick="switchAnalyticsTab('analytics')">今日</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('week')">本周</div>
+                        <div class="segment-item active" onclick="switchAnalyticsTab('month')">本月</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('history')">历史</div>
+                    </div>
+                </div>
+
+                <!-- 本月概览 -->
+                <div class="grid grid-cols-3 gap-3 px-4 mt-4">
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">1,820</p>
+                        <p class="text-xs text-gray-500 mt-0.5">平均日摄入</p>
+                        <p class="text-xs text-green-600 mt-1">↓ 3%</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">79</p>
+                        <p class="text-xs text-gray-500 mt-0.5">月健康评分</p>
+                        <p class="text-xs text-green-600 mt-1">良好</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">22/31</p>
+                        <p class="text-xs text-gray-500 mt-0.5">合规天数</p>
+                        <p class="text-xs text-yellow-600 mt-1">达标率 71%</p>
+                    </div>
+                </div>
+
+                <!-- 营养均衡度雷达图 -->
+                <div class="card mt-4">
+                    <h3 class="font-bold text-gray-800 mb-4 text-center">🎯 3月营养均衡度</h3>
+                    <div class="relative w-44 h-44 mx-auto">
+                        <svg viewBox="0 0 200 200" class="w-full h-full">
+                            <polygon points="100,20 180,60 180,140 100,180 20,140 20,60" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon points="100,40 160,70 160,130 100,160 40,130 40,70" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon points="100,60 140,80 140,120 100,140 60,120 60,80" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+                            <polygon fill="rgba(16, 185, 129, 0.2)" stroke="#10B981" stroke-width="2" points="100,45 155,75 165,130 100,155 40,130 35,75"/>
+                            <text x="100" y="15" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">蛋白质</text>
+                            <text x="190" y="55" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">碳水</text>
+                            <text x="190" y="145" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">脂肪</text>
+                            <text x="100" y="195" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">维生素</text>
+                            <text x="10" y="145" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">膳食纤维</text>
+                            <text x="10" y="55" text-anchor="middle" class="text-xs fill-gray-600" style="font-size: 10px;">矿物质</text>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-green-600">79</div>
+                                <div class="text-xs text-gray-500">本月评分</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 每周热量趋势（5周） -->
+                <div class="card mt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800">📈 每周热量趋势</h3>
+                        <span class="text-xs text-gray-400">周均值</span>
+                    </div>
+                    <div class="h-44 flex items-end justify-between gap-3 px-2">
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-200 rounded-t-lg relative cursor-pointer hover:bg-green-300 transition-colors" style="height: 65%" onclick="showWeekDetail('第1周')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1850</div>
+                            </div>
+                            <span class="text-xs text-gray-400">第1周</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-300 rounded-t-lg relative cursor-pointer hover:bg-green-400 transition-colors" style="height: 72%" onclick="showWeekDetail('第2周')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1920</div>
+                            </div>
+                            <span class="text-xs text-gray-400">第2周</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-yellow-200 rounded-t-lg relative cursor-pointer hover:bg-yellow-300 transition-colors" style="height: 85%" onclick="showWeekDetail('第3周')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">2100</div>
+                            </div>
+                            <span class="text-xs text-gray-400">第3周</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-200 rounded-t-lg relative cursor-pointer hover:bg-green-300 transition-colors" style="height: 60%" onclick="showWeekDetail('第4周')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1780</div>
+                            </div>
+                            <span class="text-xs text-gray-400">第4周</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-green-100 rounded-t-lg relative cursor-pointer hover:bg-green-200 transition-colors" style="height: 45%" onclick="showWeekDetail('第5周')">
+                                <div class="absolute -top-5 w-full text-center text-xs text-gray-600">1420</div>
+                            </div>
+                            <span class="text-xs text-gray-400">第5周</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 每周数据入口 -->
+                <div class="px-4 mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">📅 本月每周数据</h3>
+                    <div class="space-y-2">
+                        <div class="card py-3" onclick="showWeekDetail('第5周')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">第5周 (3/1-3/7)</p>
+                                        <p class="text-xs text-gray-500">5天合规</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">1,785</p>
+                                    <p class="text-xs text-gray-400">平均日摄入</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showWeekDetail('第4周')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">第4周 (2/22-2/28)</p>
+                                        <p class="text-xs text-red-500">2天超标</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-red-600">1,920</p>
+                                    <p class="text-xs text-gray-400">平均日摄入</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showWeekDetail('第3周')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">第3周 (2/15-2/21)</p>
+                                        <p class="text-xs text-gray-500">4天合规</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">1,780</p>
+                                    <p class="text-xs text-gray-400">平均日摄入</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="w-full mt-3 py-2 text-sm text-gray-500 hover:text-green-600 transition-colors">
+                        查看更多 ↓
+                    </button>
+                </div>
+
+                <!-- 本月AI分析 -->
+                <div class="card mt-4 mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-purple-800 mb-1">3月饮食分析</h4>
+                            <p class="text-purple-700 text-sm leading-relaxed">
+                                3月您的饮食整体表现良好，达标率为71%。第3周由于节日聚会导致热量较高，但整体趋势在好转。建议保持现有的蛋白质摄入水平，同时增加全谷物的比例。
+                            </p>
+                            <button onclick="switchTab('chat')" class="mt-2 text-purple-600 text-sm font-medium flex items-center gap-1">
+                                咨询下月饮食计划 →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析页 - 历史页面 -->
+            <div class="page" id="page-history">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">历史数据</h1>
+                            <p class="text-gray-500 text-sm mt-0.5">查看往期记录</p>
+                        </div>
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                            📜
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 时间维度导航 -->
+                <div class="px-4 mt-4">
+                    <div class="segment-control">
+                        <div class="segment-item" onclick="switchAnalyticsTab('analytics')">今日</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('week')">本周</div>
+                        <div class="segment-item" onclick="switchAnalyticsTab('month')">本月</div>
+                        <div class="segment-item active" onclick="switchAnalyticsTab('history')">历史</div>
+                    </div>
+                </div>
+
+                <!-- 历史概览统计 -->
+                <div class="grid grid-cols-3 gap-3 px-4 mt-4">
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">45</p>
+                        <p class="text-xs text-gray-500 mt-0.5">总记录天数</p>
+                        <p class="text-xs text-green-600 mt-1">加入 15天</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">78</p>
+                        <p class="text-xs text-gray-500 mt-0.5">历史均分</p>
+                        <p class="text-xs text-green-600 mt-1">良好</p>
+                    </div>
+                    <div class="stat-card text-center">
+                        <p class="text-2xl font-bold text-gray-800">68%</p>
+                        <p class="text-xs text-gray-500 mt-0.5">历史达标率</p>
+                        <p class="text-xs text-yellow-600 mt-1">继续努力</p>
+                    </div>
+                </div>
+
+                <!-- 按月查看 -->
+                <div class="px-4 mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">📅 按月查看</h3>
+                    <div class="space-y-3">
+                        <div class="card py-3" onclick="switchAnalyticsTab('month'); showToast('切换到3月视图')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-lg">📅</div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">2025年3月</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">已记录 7 天 • 22天合规</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-green-600">79</p>
+                                    <p class="text-xs text-gray-400">评分</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showToast('切换到2月视图')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-lg">📅</div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">2025年2月</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">已记录 28 天 • 18天合规</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">76</p>
+                                    <p class="text-xs text-gray-400">评分</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3 opacity-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-lg">📅</div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">2025年1月</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">无记录</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-400">--</p>
+                                    <p class="text-xs text-gray-400">评分</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 按周查看 -->
+                <div class="px-4 mt-5">
+                    <h3 class="font-bold text-gray-800 mb-3">📅 按周查看</h3>
+                    <div class="space-y-2">
+                        <div class="card py-3" onclick="switchAnalyticsTab('week'); showToast('切换到本周视图')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">第9周 (3/1-3/7)</p>
+                                        <p class="text-xs text-gray-500">本周 • 5天合规</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-green-600">82</p>
+                                    <p class="text-xs text-gray-400">评分</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card py-3" onclick="showToast('切换到该周视图')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">📅</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-800">第8周 (2/22-2/28)</p>
+                                        <p class="text-xs text-red-500">2天超标</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-gray-800">75</p>
+                                    <p class="text-xs text-gray-400">评分</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="w-full mt-3 py-2 text-sm text-gray-500 hover:text-green-600 transition-colors">
+                        查看更多历史周 ↓
+                    </button>
+                </div>
+
+                <!-- 按日查看 -->
+                <div class="px-4 mt-5 mb-6">
+                    <h3 class="font-bold text-gray-800 mb-3">📅 按日查看</h3>
+                    <div class="card py-3" onclick="switchAnalyticsTab('analytics'); showToast('切换到今日视图')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-lg">📅</span>
+                                <div>
+                                    <p class="font-semibold text-gray-800">今日 (3月6日)</p>
+                                    <p class="text-xs text-gray-500">2餐记录 • 进行中</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-green-600">85</p>
+                                <p class="text-xs text-gray-400">评分</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="w-full mt-3 py-2 text-sm text-gray-500 hover:text-green-600 transition-colors">
+                        查看日历选择日期 →
+                    </button>
+                </div>
+            </div>
+
+            <!-- 规划页 -->
+            <!-- 咨询页面 -->
+            <div class="page" id="page-consult">
+                <div class="bg-white p-5 rounded-b-3xl shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">健康咨询</h1>
+                            <p class="text-gray-500 text-sm mt-0.5">AI助力您的饮食健康</p>
+                        </div>
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center text-xl">
+                            🤖
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-4 mt-6 space-y-4">
+                    <!-- 智能生成食谱入口 -->
+                    <div class="card p-5 cursor-pointer hover:shadow-lg transition-all" onclick="switchTab('mealPlanner')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-orange-200">
+                                🥡
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 text-lg">智能生成食谱</h3>
+                                <p class="text-gray-500 text-sm mt-1">AI根据您的身体数据和目标，自动生成饮食方案</p>
+                            </div>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <span class="px-2 py-1 bg-orange-50 text-orange-600 rounded-lg text-xs">AI分析</span>
+                            <span class="px-2 py-1 bg-orange-50 text-orange-600 rounded-lg text-xs">科学配比</span>
+                            <span class="px-2 py-1 bg-orange-50 text-orange-600 rounded-lg text-xs">一键生成</span>
+                        </div>
+                    </div>
+
+                    <!-- AI咨询入口 -->
+                    <div class="card p-5 cursor-pointer hover:shadow-lg transition-all" onclick="switchTab('chat')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-green-200">
+                                🤖
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800 text-lg">AI营养顾问</h3>
+                                <p class="text-gray-500 text-sm mt-1">随时咨询饮食问题，获取专业健康建议</p>
+                            </div>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <span class="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-xs">实时回复</span>
+                            <span class="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-xs">数据同步</span>
+                            <span class="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-xs">科学建议</span>
+                        </div>
+                    </div>
+
+                    <!-- 热门咨询问题 -->
+                    <div class="mt-6">
+                        <h3 class="font-bold text-gray-800 mb-3">热门咨询问题</h3>
+                        <div class="space-y-2">
+                            <button onclick="switchTab('chat')" class="w-full card py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                <span class="text-sm text-gray-700">减脂期怎么吃不饿？</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                            <button onclick="switchTab('chat')" class="w-full card py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                <span class="text-sm text-gray-700">运动后怎么补充蛋白质？</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                            <button onclick="switchTab('chat')" class="w-full card py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                <span class="text-sm text-gray-700">哪些食物不能一起吃？</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的食谱页面 -->
+            <div class="page" id="page-myMealPlan">
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('consult')" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">我的食谱</h1>
+                            <p class="text-gray-500 text-sm">管理您的饮食计划</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-4 mt-5 space-y-4">
+                    <!-- 当前食谱状态卡片 -->
+                    <div class="card bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                                🥡
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-800">当前饮食计划</h3>
+                                <p class="text-xs text-gray-500 mt-0.5" id="planStatusText">未设置食谱</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-white/60 rounded-lg p-2">
+                                <p class="text-lg font-bold text-gray-800" id="currentCalories">--</p>
+                                <p class="text-xs text-gray-500">每日摄入</p>
+                            </div>
+                            <div class="bg-white/60 rounded-lg p-2">
+                                <p class="text-lg font-bold text-gray-800" id="currentMeals">--</p>
+                                <p class="text-xs text-gray-500">每日餐数</p>
+                            </div>
+                            <div class="bg-white/60 rounded-lg p-2">
+                                <p class="text-lg font-bold text-gray-800" id="currentGoal">--</p>
+                                <p class="text-xs text-gray-500">饮食目标</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 自定义设置 -->
+                    <div class="card">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-800">自定义设置</h3>
+                            <span class="text-xs text-orange-500 bg-orange-50 px-2 py-1 rounded-full">手动调整</span>
+                        </div>
+                        
+                        <!-- 每日摄入量 -->
+                        <div class="mb-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm text-gray-700">每日摄入量</label>
+                                <span class="text-sm font-bold text-orange-600" id="calorieValue">2000 kcal</span>
+                            </div>
+                            <input type="range" id="calorieSlider" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="1200" max="3500" value="2000" step="50" oninput="updateCalorieValue(this.value)">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>1200</span>
+                                <span>3500</span>
+                            </div>
+                        </div>
+
+                        <!-- 每日餐数 -->
+                        <div class="mb-4">
+                            <label class="text-sm text-gray-700 mb-2 block">每日餐数</label>
+                            <div class="segment-control">
+                                <button class="segment-item" onclick="selectMealCount(2, this)">2餐</button>
+                                <button class="segment-item active" onclick="selectMealCount(3, this)">3餐</button>
+                                <button class="segment-item" onclick="selectMealCount(4, this)">4餐</button>
+                                <button class="segment-item" onclick="selectMealCount(5, this)">5餐</button>
+                            </div>
+                        </div>
+
+                        <!-- 饮食目标 -->
+                        <div class="mb-4">
+                            <label class="text-sm text-gray-700 mb-2 block">饮食目标</label>
+                            <div class="segment-control">
+                                <button class="segment-item active" onclick="selectGoal('减脂', this)">减脂</button>
+                                <button class="segment-item" onclick="selectGoal('增肌', this)">增肌</button>
+                                <button class="segment-item" onclick="selectGoal('维持', this)">维持</button>
+                            </div>
+                        </div>
+
+                        <!-- 食物偏好 -->
+                        <div class="mb-2">
+                            <label class="text-sm text-gray-700 mb-2 block">食物偏好</label>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="tag active cursor-pointer" onclick="toggleTag(this)">清淡</span>
+                                <span class="tag cursor-pointer" onclick="toggleTag(this)">微辣</span>
+                                <span class="tag cursor-pointer" onclick="toggleTag(this)">无辣不欢</span>
+                                <span class="tag cursor-pointer" onclick="toggleTag(this)">少油</span>
+                                <span class="tag cursor-pointer" onclick="toggleTag(this)">低糖</span>
+                                <span class="tag cursor-pointer" onclick="toggleTag(this)">高蛋白</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 智能定制入口 -->
+                    <div class="card bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 cursor-pointer hover:shadow-lg transition-all" onclick="switchTab('mealPlanner')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                                🤖
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-800">智能定制食谱</h3>
+                                <p class="text-sm text-gray-500">不确定怎么设置？让AI帮您定制</p>
+                            </div>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-600">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 当前食谱预览 -->
+                    <div class="card" id="mealPlanPreview" style="display: none;">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-gray-800">本周食谱</h3>
+                            <div class="flex gap-2">
+                                <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full" id="planTypeLabel">自定义</span>
+                                <button onclick="editMealPlan()" class="text-xs text-blue-600 hover:underline">编辑</button>
+                            </div>
+                        </div>
+                        <div class="space-y-2" id="weekPlanList">
+                            <!-- 动态生成 -->
+                        </div>
+                    </div>
+
+                    <!-- 空状态提示 -->
+                    <div class="card py-8 text-center" id="emptyPlanState">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-3xl mx-auto mb-3">
+                            📭
+                        </div>
+                        <p class="text-gray-500 text-sm">还没有设置食谱</p>
+                        <p class="text-gray-400 text-xs mt-1">在上方调整设置，或点击智能定制</p>
+                    </div>
+
+                    <!-- 保存按钮 -->
+                    <button onclick="saveMyMealPlan()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 hover:shadow-xl transition-all active:scale-95 mb-6">
+                        💾 保存食谱设置
+                    </button>
+                </div>
+            </div>
+
+            <!-- 智能食谱定制页面 -->
+            <div class="page" id="page-mealPlanner">
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('myMealPlan')" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">智能食谱定制</h1>
+                            <p class="text-gray-500 text-sm">AI为您生成专属方案</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-4 mt-5 space-y-3">
+                    <!-- 说明卡片 -->
+                    <div class="card bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">💡</span>
+                            <div>
+                                <h3 class="font-semibold text-green-800 mb-1">智能定制说明</h3>
+                                <p class="text-green-700 text-sm leading-relaxed">
+                                    AI将根据您的身体数据、饮食偏好和目标，自动计算最佳的每日摄入量和营养配比。生成后您可以在"我的食谱"中进行调整。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 身体数据确认 -->
+                    <div class="card">
+                        <h3 class="font-semibold text-gray-800 mb-3">基于以下数据生成</h3>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <span class="text-gray-500">身高</span>
+                                <p class="font-bold text-gray-800">170 cm</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <span class="text-gray-500">体重</span>
+                                <p class="font-bold text-gray-800">65 kg</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <span class="text-gray-500">年龄</span>
+                                <p class="font-bold text-gray-800">25 岁</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <span class="text-gray-500">性别</span>
+                                <p class="font-bold text-gray-800">男</p>
+                            </div>
+                        </div>
+                        <button onclick="switchTab('profileEdit')" class="mt-3 text-sm text-blue-600 hover:underline">身体数据不对？点此修改 →</button>
+                    </div>
+
+                    <!-- 饮食目标 -->
+                    <div class="card">
+                        <h3 class="font-semibold text-gray-800 mb-3">您的饮食目标</h3>
+                        <div class="segment-control">
+                            <button class="segment-item active" onclick="selectAIGoal('减脂', this)">减脂</button>
+                            <button class="segment-item" onclick="selectAIGoal('增肌', this)">增肌</button>
+                            <button class="segment-item" onclick="selectAIGoal('维持', this)">维持</button>
+                        </div>
+                    </div>
+
+                    <!-- 口味偏好 -->
+                    <div class="card">
+                        <h3 class="font-semibold text-gray-800 mb-3">口味偏好（可多选）</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="tag active cursor-pointer" onclick="toggleAITag(this)">清淡</span>
+                            <span class="tag cursor-pointer" onclick="toggleAITag(this)">微辣</span>
+                            <span class="tag cursor-pointer" onclick="toggleAITag(this)">无辣不欢</span>
+                            <span class="tag cursor-pointer" onclick="toggleAITag(this)">少油</span>
+                            <span class="tag cursor-pointer" onclick="toggleAITag(this)">低糖</span>
+                        </div>
+                    </div>
+
+                    <!-- 饮食禁忌 -->
+                    <div class="card">
+                        <h3 class="font-semibold text-gray-800 mb-3">饮食禁忌</h3>
+                        <input type="text" placeholder="输入过敏源或不吃的食物，如：海鲜、香菜..." class="input-field">
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <span class="tag bg-red-50 text-red-600 cursor-pointer">海鲜 ×</span>
+                            <span class="tag bg-red-50 text-red-600 cursor-pointer">香菜 ×</span>
+                        </div>
+                    </div>
+
+                    <!-- 预览区域 -->
+                    <div class="card bg-gray-50" id="aiPlanPreview">
+                        <div class="text-center py-6">
+                            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-3xl mx-auto mb-3">
+                                🎯
+                            </div>
+                            <p class="text-gray-500 text-sm">点击下方按钮生成您的专属食谱</p>
+                        </div>
+                    </div>
+
+                    <button class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-200 hover:shadow-xl transition-all active:scale-95 mb-6" onclick="generateAIPlan()">
+                        🤖 生成智能食谱
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI咨询页（深度整合） -->
+            <div class="page" id="page-chat">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-xl shadow-lg shadow-green-200">
+                            🤖
+                        </div>
+                        <div class="flex-1">
+                            <h1 class="font-bold text-gray-800">AI营养顾问</h1>
+                            <p class="text-xs text-green-600 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                在线
+                            </p>
+                        </div>
+                        <button onclick="switchTab('home')" class="text-gray-400 hover:text-gray-600 p-2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 今日数据快照 -->
+                <div class="px-4 mt-3">
+                    <div class="card bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 py-3">
+                        <p class="text-xs text-green-600 mb-2">📊 今日数据快照</p>
+                        <div class="flex justify-around">
+                            <div class="text-center">
+                                <p class="text-lg font-bold text-gray-800">1,250</p>
+                                <p class="text-xs text-gray-500">已摄入</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-lg font-bold text-green-600">750</p>
+                                <p class="text-xs text-gray-500">剩余额度</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-lg font-bold text-orange-500">2</p>
+                                <p class="text-xs text-gray-500">餐次记录</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 聊天区域 -->
+                <div class="px-4 py-3 flex flex-col">
+                    <!-- AI欢迎消息 -->
+                    <div class="chat-bubble chat-left">
+                        <p class="font-medium mb-1">👋 您好！我是您的AI营养顾问</p>
+                        <p>我已同步您今日的饮食记录。今日蛋白质摄入充足，但蔬菜略显不足。有什么可以帮您？</p>
+                    </div>
+
+                    <!-- 快捷问题（根据今日数据推荐） -->
+                    <div class="flex flex-wrap gap-2 my-2">
+                        <button class="px-3 py-1.5 bg-white border border-green-200 rounded-full text-xs text-green-700 shadow-sm hover:bg-green-50 transition-colors">
+                            今天还能吃多少？
+                        </button>
+                        <button class="px-3 py-1.5 bg-white border border-green-200 rounded-full text-xs text-green-700 shadow-sm hover:bg-green-50 transition-colors">
+                            推荐今晚晚餐
+                        </button>
+                        <button class="px-3 py-1.5 bg-white border border-green-200 rounded-full text-xs text-green-700 shadow-sm hover:bg-green-50 transition-colors">
+                            分析本周趋势
+                        </button>
+                        <button class="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600 shadow-sm hover:bg-gray-50 transition-colors">
+                            孕妇能吃什么？
+                        </button>
+                    </div>
+
+                    <!-- 对话示例 -->
+                    <div class="chat-bubble chat-right">
+                        今天还能吃多少热量？
+                    </div>
+
+                    <div class="chat-bubble chat-left">
+                        <p class="mb-2">根据您今日的记录和目标：</p>
+                        <ul class="space-y-1.5 text-sm">
+                            <li class="flex items-start gap-2">
+                                <span class="text-green-500">✓</span>
+                                <span>剩余可摄入 <strong>750 kcal</strong></span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-yellow-500">⚠</span>
+                                <span>建议主食控制在150g以内</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-green-500">✓</span>
+                                <span>必须补充蔬菜（至少150g）</span>
+                            </li>
+                        </ul>
+                        <button class="mt-3 text-green-600 text-sm font-medium flex items-center gap-1 hover:underline">
+                            查看推荐菜单 →
+                        </button>
+                    </div>
+
+                    <div class="chat-bubble chat-right">
+                        那我晚上想吃火锅可以吗？
+                    </div>
+
+                    <div class="chat-bubble chat-left">
+                        <p class="mb-2">🚨 <strong>建议谨慎</strong></p>
+                        <p>火锅热量较高，单次容易超标。如果确实想吃，建议：</p>
+                        <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
+                            <li>选择清汤底，避免重油</li>
+                            <li>多选蔬菜、豆制品</li>
+                            <li>控制肉类在100g以内</li>
+                            <li>避免饭后饮料和炸货</li>
+                        </ul>
+                        <p class="mt-2 text-sm">预估合理搭配约 <strong>600-700 kcal</strong>，在您的剩余额度内。</p>
+                    </div>
+                </div>
+
+                <!-- 底部输入框 -->
+                <div class="fixed bottom-[84px] left-0 right-0 bg-white border-t border-gray-100 p-3" style="width: 351px; margin: 0 auto; border-radius: 0 0 30px 30px;">
+                    <div class="flex items-center gap-2">
+                        <button class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                        <div class="flex-1 relative">
+                            <input type="text" placeholder="输入您的饮食问题..." 
+                                class="w-full bg-gray-100 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 transition-all">
+                        </div>
+                        <button class="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-200 active:scale-95 transition-transform">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex gap-2 mt-2 px-1">
+                        <button class="flex-1 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1">
+                            <span>📷</span> 拍照识菜
+                        </button>
+                        <button class="flex-1 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1">
+                            <span>📊</span> 查看报告
+                        </button>
+                        <button class="flex-1 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1">
+                            <span>📅</span> 历史记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的页 -->
+            <div class="page" id="page-profile">
+                <div class="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 pb-8">
+                    <div class="flex items-center gap-4">
+                        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-4xl backdrop-blur-sm border-2 border-white/30">
+                            😊
+                        </div>
+                        <div class="flex-1">
+                            <h1 class="text-2xl font-bold">User</h1>
+                            <p class="text-green-100 text-sm mt-0.5">ID: 12345678</p>
+                            <p class="text-green-100 text-xs mt-1">加入膳智 15 天</p>
+                        </div>
+                        <button class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 饮食画像 -->
+                <div class="px-4 -mt-4">
+                    <div class="card bg-white/90 backdrop-blur">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-gray-800">🏷️ 我的饮食画像</h3>
+                            <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">AI生成</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium">🍳 早餐战士</span>
+                            <span class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">⚖️ 低碳先锋</span>
+                            <span class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium">🌶️ 爱吃辣</span>
+                            <span class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">🥩 蛋白质爱好者</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-3 leading-relaxed">
+                            AI分析：您坚持吃早餐的习惯非常好，但蔬菜摄入频率偏低，建议增加深色蔬菜比例。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 成就徽章 -->
+                <div class="px-4 mt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-gray-800">🏆 成就徽章</h3>
+                        <span class="text-sm text-gray-500">4/12</span>
+                    </div>
+                    <div class="flex justify-between px-2">
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="badge">🔥</div>
+                            <span class="text-xs text-gray-600 text-center">连续7天<br>记录</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="badge">⚖️</div>
+                            <span class="text-xs text-gray-600 text-center">营养均衡<br>达标</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="badge">🍬</div>
+                            <span class="text-xs text-gray-600 text-center">控糖<br>卫士</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="badge locked">🔒</div>
+                            <span class="text-xs text-gray-400 text-center">蔬菜<br>达人</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 功能列表 -->
+                <div class="px-4 mt-5 space-y-2">
+                    <div class="card py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="switchTab('profileEdit')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-lg">👤</div>
+                            <span class="text-gray-800 font-medium">个人画像</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+
+                    <div class="card py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="switchTab('myMealPlan')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-lg">🥡</div>
+                            <span class="text-gray-800 font-medium">我的食谱</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+
+                    <div class="card py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="switchTab('history'); switchAnalyticsTab('history')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-lg">📊</div>
+                            <span class="text-gray-800 font-medium">详细数据报告</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+
+                    <div class="card py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="switchTab('tipLibrary')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center text-lg">💡</div>
+                            <span class="text-gray-800 font-medium">个性化提示库</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+
+                    <div class="card py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="switchTab('notificationSettings')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-lg">🔔</div>
+                            <span class="text-gray-800 font-medium">提醒设置</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- 退出登录 -->
+                <div class="px-4 mt-4 mb-8">
+                    <div class="card py-3.5 flex items-center justify-center cursor-pointer text-red-500 hover:bg-red-50 transition-colors">
+                        <span class="font-medium">🚪 退出登录</span>
+                    </div>
+                    <p class="text-center mt-4 text-gray-400 text-xs">膳智 DietWise v2.0.0</p>
+                </div>
+            </div>
+
+        </div>
+
+            <!-- 个性化提示库页面 -->
+            <div class="page" id="page-tipLibrary">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('profile')" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">个性化提示库</h1>
+                            <p class="text-gray-500 text-sm">自定义首页展示的建议</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 说明卡片 -->
+                <div class="px-4 mt-4">
+                    <div class="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">💡</span>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-1">如何使用</h3>
+                                <p class="text-blue-700 text-sm leading-relaxed">
+                                    添加您想在首页展示的个性化提示，如果没有添加任何提示，系统将自动展示AI智能建议。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 已添加的提示 -->
+                <div class="px-4 mt-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-gray-800">已添加的提示 <span class="text-sm font-normal text-gray-500">(2条)</span></h3>
+                        <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">随机展示</span>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="card bg-white border-l-4 border-pink-400">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="text-gray-700 text-sm flex-1">记得多喝水，每天至少2000ml！</p>
+                                <div class="flex gap-1">
+                                    <button class="p-1.5 hover:bg-gray-100 rounded-full text-gray-400" title="编辑">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                    </button>
+                                    <button class="p-1.5 hover:bg-red-50 rounded-full text-red-400" title="删除">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card bg-white border-l-4 border-green-400">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="text-gray-700 text-sm flex-1">晚餐尽量在6点前完成，有助于消化和睡眠质量。</p>
+                                <div class="flex gap-1">
+                                    <button class="p-1.5 hover:bg-gray-100 rounded-full text-gray-400" title="编辑">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                    </button>
+                                    <button class="p-1.5 hover:bg-red-50 rounded-full text-red-400" title="删除">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 添加新提示 -->
+                <div class="px-4 mt-5">
+                    <h3 class="font-bold text-gray-800 mb-3">添加新提示</h3>
+                    <div class="card">
+                        <textarea 
+                            id="newTipInput"
+                            placeholder="输入您想在首页展示的提示，如：记得多喝水、今天要吃蔬菜..." 
+                            class="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-400 resize-none"
+                            rows="3"
+                        ></textarea>
+                        <div class="flex justify-between items-center mt-3">
+                            <span class="text-xs text-gray-400">最多100字</span>
+                            <button onclick="addNewTip()" class="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors">
+                                添加提示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 预设建议 -->
+                <div class="px-4 mt-5 mb-6">
+                    <h3 class="font-bold text-gray-800 mb-3">预设建议 <span class="text-sm font-normal text-gray-500">(点击快速添加)</span></h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="quickAddTip('每天喝足2L水，保持身体水分平衡')" class="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-pink-100 hover:text-pink-600 transition-colors">
+                            💧 多喝水
+                        </button>
+                        <button onclick="quickAddTip('每餐至少吃一拵蔬菜，补充膳食纤维')" class="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-green-100 hover:text-green-600 transition-colors">
+                            🥬 多吃蔬菜
+                        </button>
+                        <button onclick="quickAddTip('晚上8点后不要进食，让胃休息')" class="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-orange-100 hover:text-orange-600 transition-colors">
+                            🌙 不吃夜宵
+                        </button>
+                        <button onclick="quickAddTip('细嚼慢咽，每口嚼20下以上')" class="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-colors">
+                            🤤 细嚼慢咽
+                        </button>
+                        <button onclick="quickAddTip('不要边看手机边吃饭，专注享受美食')" class="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                            📱 专心用餐
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人画像设置页面 -->
+            <div class="page" id="page-profileEdit">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('home')" id="profileEditBackBtn" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">个人画像</h1>
+                            <p class="text-gray-500 text-sm">编辑您的个人信息</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 头像设置 -->
+                <div class="px-4 mt-6">
+                    <div class="flex flex-col items-center">
+                        <div class="relative">
+                            <div class="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-lg" id="avatarPreview">
+                                😊
+                            </div>
+                            <button onclick="changeAvatar()" class="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center text-gray-600 hover:bg-gray-50">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                    <circle cx="12" cy="13" r="4"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-3">点击头像更换</p>
+                    </div>
+                </div>
+
+                <!-- 表情选择 -->
+                <div class="px-4 mt-5">
+                    <h3 class="font-bold text-gray-800 mb-3">选择头像</h3>
+                    <div class="grid grid-cols-6 gap-3">
+                        <button onclick="selectAvatar('😊')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">😊</button>
+                        <button onclick="selectAvatar('😄')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">😄</button>
+                        <button onclick="selectAvatar('🤔')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🤔</button>
+                        <button onclick="selectAvatar('😎')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">😎</button>
+                        <button onclick="selectAvatar('🤬')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🤬</button>
+                        <button onclick="selectAvatar('😍')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">😍</button>
+                        <button onclick="selectAvatar('🤓')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🤓</button>
+                        <button onclick="selectAvatar('💪')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">💪</button>
+                        <button onclick="selectAvatar('🌟')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🌟</button>
+                        <button onclick="selectAvatar('🐼')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🐼</button>
+                        <button onclick="selectAvatar('🌸')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🌸</button>
+                        <button onclick="selectAvatar('🍎')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl hover:bg-green-100 transition-colors">🍎</button>
+                    </div>
+                </div>
+
+                <!-- 基本信息 -->
+                <div class="px-4 mt-6">
+                    <h3 class="font-bold text-gray-800 mb-3">基本信息</h3>
+                    <div class="card space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-500 mb-1">昵称</label>
+                            <input type="text" id="nicknameInput" value="User" class="w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-800 outline-none focus:ring-2 focus:ring-green-500" placeholder="输入您的昵称">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-500 mb-1">用户ID</label>
+                            <input type="text" value="12345678" disabled class="w-full bg-gray-100 rounded-xl px-4 py-3 text-gray-400 cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-500 mb-1">个性签名</label>
+                            <input type="text" id="bioInput" value="记录饮食，养成健康习惯" class="w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-800 outline-none focus:ring-2 focus:ring-green-500" placeholder="输入个性签名">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 身体数据 -->
+                <div class="px-4 mt-5">
+                    <h3 class="font-bold text-gray-800 mb-3">身体数据</h3>
+                    <div class="card space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm text-gray-500 mb-1">身高 (cm)</label>
+                                <input type="number" value="170" class="w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-800 outline-none focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-500 mb-1">体重 (kg)</label>
+                                <input type="number" value="65" class="w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-800 outline-none focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-500 mb-1">性别</label>
+                            <div class="flex gap-3">
+                                <button class="flex-1 py-2 bg-green-500 text-white rounded-xl text-sm font-medium">男</button>
+                                <button class="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium">女</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-500 mb-1">年龄</label>
+                            <input type="number" value="25" class="w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-800 outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 保存按钮 -->
+                <div class="px-4 mt-6 mb-8">
+                    <button onclick="saveProfile()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-200 hover:shadow-xl transition-all active:scale-95">
+                        保存修改
+                    </button>
+                </div>
+            </div>
+
+            <!-- 提醒设置详情页面 -->
+            <div class="page" id="page-notificationSettings">
+                <!-- 顶部导航 -->
+                <div class="page-header">
+                    <div class="flex items-center gap-3">
+                        <button onclick="switchTab('profile')" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">提醒设置</h1>
+                            <p class="text-gray-500 text-sm">管理您的通知提醒</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主开关 -->
+                <div class="px-4 mt-4">
+                    <div class="card flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🔔</span>
+                            <div>
+                                <p class="font-semibold text-gray-800">接收通知提醒</p>
+                                <p class="text-xs text-gray-500">打开后才会接收下面的提醒</p>
+                            </div>
+                        </div>
+                        <button id="mainToggle" onclick="toggleMainSwitch()" class="w-12 h-7 bg-green-500 rounded-full relative transition-colors">
+                            <span class="absolute right-1 top-1 w-5 h-5 bg-white rounded-full shadow transition-transform"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 提醒项设置 -->
+                <div class="px-4 mt-5">
+                    <h3 class="font-bold text-gray-800 mb-3">提醒项设置</h3>
+                    
+                    <!-- 早餐提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🍳</span>
+                                <span class="font-medium text-gray-800">早餐提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <span>每天</span>
+                            <select class="bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-green-500">
+                                <option>07:30</option>
+                                <option>08:00</option>
+                                <option selected>08:30</option>
+                                <option>09:00</option>
+                            </select>
+                            <span>提醒我吃早餐</span>
+                        </div>
+                    </div>
+
+                    <!-- 午餐提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🍣</span>
+                                <span class="font-medium text-gray-800">午餐提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <span>每天</span>
+                            <select class="bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-green-500">
+                                <option>11:30</option>
+                                <option selected>12:00</option>
+                                <option>12:30</option>
+                                <option>13:00</option>
+                            </select>
+                            <span>提醒我吃午餐</span>
+                        </div>
+                    </div>
+
+                    <!-- 晚餐提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🌙</span>
+                                <span class="font-medium text-gray-800">晚餐提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <span>每天</span>
+                            <select class="bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-green-500">
+                                <option>17:30</option>
+                                <option selected>18:00</option>
+                                <option>18:30</option>
+                                <option>19:00</option>
+                            </select>
+                            <span>提醒我吃晚餐</span>
+                        </div>
+                    </div>
+
+                    <!-- 饮水提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">💧</span>
+                                <span class="font-medium text-gray-800">饮水提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                                <span>每隔</span>
+                                <select class="bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-green-500">
+                                    <option>1小时</option>
+                                    <option selected>2小时</option>
+                                    <option>3小时</option>
+                                    <option>4小时</option>
+                                </select>
+                                <span>提醒一次</span>
+                            </div>
+                            <p class="text-xs text-gray-400">运行时间：08:00 - 22:00</p>
+                        </div>
+                    </div>
+
+                    <!-- 记录提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">✍️</span>
+                                <span class="font-medium text-gray-800">记录提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="space-y-2">
+                            <p class="text-sm text-gray-600">用餐后30分钟提醒记录饮食</p>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500">提醒方式：</span>
+                                <label class="flex items-center gap-1 text-sm text-gray-600">
+                                    <input type="radio" name="recordReminder" class="accent-green-500" checked>
+                                    通知栏
+                                </label>
+                                <label class="flex items-center gap-1 text-sm text-gray-600">
+                                    <input type="radio" name="recordReminder" class="accent-green-500">
+                                    弹窗
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 睡前提醒 -->
+                    <div class="card mb-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">😴</span>
+                                <span class="font-medium text-gray-800">睡前提醒</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <span>每天</span>
+                            <select class="bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-green-500">
+                                <option>21:00</option>
+                                <option selected>21:30</option>
+                                <option>22:00</option>
+                                <option>22:30</option>
+                            </select>
+                            <span>提醒明日饮食计划</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提醒音设置 -->
+                <div class="px-4 mt-5 mb-6">
+                    <h3 class="font-bold text-gray-800 mb-3">提醒音设置</h3>
+                    <div class="card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-700">提醒音效果</span>
+                            <select class="bg-gray-100 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-green-500">
+                                <option selected>默认提示音</option>
+                                <option>清脆提示音</option>
+                                <option>柔和提示音</option>
+                                <option>无声</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-700">震动</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- Tab栏 -->
+        <div class="tab-bar">
+            <div class="tab-item active" onclick="switchTab('home')">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span class="text-xs mt-1 font-medium">首页</span>
+            </div>
+
+            <div class="tab-item" onclick="switchTab('analytics')">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <span class="text-xs mt-1 font-medium">分析</span>
+            </div>
+
+            <!-- FAB按钮 -->
+            <div class="fab-button" onclick="switchTab('record')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </div>
+
+            <div class="tab-item" onclick="switchTab('consult')">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+                <span class="text-xs mt-1 font-medium">咨询</span>
+            </div>
+
+            <div class="tab-item" onclick="switchTab('profile')">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span class="text-xs mt-1 font-medium">我的</span>
+            </div>
+        </div>
+
+        <!-- Toast提示 -->
+        <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm opacity-0 transition-opacity pointer-events-none z-50">
+            提示信息
+        </div>
+    </div>
+</div>
+
+<script>
+    // 当前选中的Tab索引
+    let currentTabIndex = 0;
+
+    // AI建议库
+    const aiTips = [
+        "根据您近期的饮食数据，蔬菜摄入量较低，建议今晚增加一份清炒时蔬。",
+        "您今日的蛋白质摄入充足，保持得很好！记得多喝水促进代谢。",
+        "连续3天早餐规律，这是一个很好的习惯，请继续保持。",
+        "本周钠摄入较高，建议减少外卖和加工食品的摄入。",
+        "您的碳水摄入偏低，可以适当增加全谷物的比例。",
+        "注意多吃深色蔬菜，补充维生素和矿物质。",
+        "晚餐建议在6点前完成，有助于消化和睡眠质量。",
+        "今日热量摄入刚好，保持现在的节奏！",
+        "检测到您近两天水果摄入不足，建议今天吃一个苹果。",
+        "您的饮食结构相对均衡，继续保持多样化的饮食习惯。"
+    ];
+
+    // 用户自定义提示库
+    let userTips = JSON.parse(localStorage.getItem('userTips') || '[]');
+
+    // 页面切换逻辑
+    function switchTab(pageName) {
+        // 隐藏所有页面
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+        });
+        
+        // 显示目标页面
+        const targetPage = document.getElementById('page-' + pageName);
+        if (targetPage) {
+            targetPage.classList.add('active');
+        }
+        
+        // 更新Tab状态（只有主导航页面才高亮Tab）
+        document.querySelectorAll('.tab-item').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // 高亮对应的Tab（仅限主导航页面）
+        const tabMap = {
+            'home': 0,
+            'analytics': 1,
+            'record': 2,
+            'planner': 3,
+            'profile': 4
+        };
+        
+        if (tabMap[pageName] !== undefined) {
+            const tabItems = document.querySelectorAll('.tab-item');
+            if (tabItems[tabMap[pageName]]) {
+                tabItems[tabMap[pageName]].classList.add('active');
+                currentTabIndex = tabMap[pageName];
+            }
+        }
+        
+        // 滚动到顶部
+        document.getElementById('contentArea').scrollTop = 0;
+    }
+
+    // 分析页面子Tab切换
+    function switchAnalyticsTab(view) {
+        // 隐藏所有分析相关页面
+        ['analytics', 'week', 'month', 'history'].forEach(id => {
+            const page = document.getElementById('page-' + id);
+            if (page) page.classList.remove('active');
+        });
+        
+        // 显示对应页面
+        const targetPage = document.getElementById('page-' + view);
+        if (targetPage) {
+            targetPage.classList.add('active');
+        }
+        
+        // 更新分段控制器状态
+        document.querySelectorAll('.segment-control .segment-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // 找到对应的按钮并高亮
+        const viewNames = {
+            'analytics': '今日',
+            'week': '本周',
+            'month': '本月',
+            'history': '历史'
+        };
+        
+        document.querySelectorAll('.segment-control .segment-item').forEach(item => {
+            if (item.textContent === viewNames[view]) {
+                item.classList.add('active');
+            }
+        });
+        
+        // 滚动到顶部
+        document.getElementById('contentArea').scrollTop = 0;
+    }
+
+    // 选择头像
+    function selectAvatar(avatar) {
+        document.getElementById('avatarPreview').textContent = avatar;
+        showToast('已选择头像');
+    }
+
+    // 更换头像
+    function changeAvatar() {
+        const avatars = ['😊', '😄', '🤔', '😎', '🤬', '😍', '🤓', '💪', '🌟', '🐼', '🌸', '🍎'];
+        const current = document.getElementById('avatarPreview').textContent.trim();
+        const currentIndex = avatars.indexOf(current);
+        const nextIndex = (currentIndex + 1) % avatars.length;
+        document.getElementById('avatarPreview').textContent = avatars[nextIndex];
+    }
+
+    // 保存个人画像
+    function saveProfile() {
+        const avatar = document.getElementById('avatarPreview').textContent.trim();
+        const nickname = document.getElementById('nicknameInput').value.trim();
+        const bio = document.getElementById('bioInput').value.trim();
+        
+        if (!nickname) {
+            showToast('请输入昵称');
+            return;
+        }
+        
+        // 保存到localStorage
+        const profile = { avatar, nickname, bio };
+        localStorage.setItem('userProfile', JSON.stringify(profile));
+        
+        // 更新首页和我的页面显示
+        updateProfileDisplay();
+        
+        showToast('保存成功！');
+        
+        // 返回首页或我的页面
+        setTimeout(() => {
+            const backBtn = document.getElementById('profileEditBackBtn');
+            if (backBtn && backBtn.onclick.toString().includes('home')) {
+                switchTab('home');
+            } else {
+                switchTab('profile');
+            }
+        }, 500);
+    }
+
+    // 更新个人信息显示
+    function updateProfileDisplay() {
+        const profile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+        if (profile.nickname) {
+            // 更新首页显示
+            const homeGreeting = document.querySelector('#page-home h1');
+            if (homeGreeting) {
+                homeGreeting.innerHTML = `早上好，${profile.nickname} 👋`;
+            }
+            // 更新我的页面显示
+            const profileName = document.querySelector('#page-profile h1');
+            if (profileName) {
+                profileName.textContent = profile.nickname;
+            }
+        }
+        if (profile.avatar) {
+            // 更新首页头像
+            const homeAvatar = document.querySelector('#page-home .w-10.h-10.bg-green-100');
+            if (homeAvatar) {
+                homeAvatar.textContent = profile.avatar;
+            }
+            // 更新我的页面头像
+            const profileAvatar = document.querySelector('#page-profile .text-4xl');
+            if (profileAvatar) {
+                profileAvatar.textContent = profile.avatar;
+            }
+        }
+    }
+
+    // ================= 我的食谱功能 =================
+
+    // 更新卡路里数值显示
+    function updateCalorieValue(value) {
+        document.getElementById('calorieValue').textContent = value + ' kcal';
+    }
+
+    // 选择餐数
+    let selectedMealCount = 3;
+    function selectMealCount(count, element) {
+        selectedMealCount = count;
+        // 更新UI
+        element.parentElement.querySelectorAll('.segment-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        element.classList.add('active');
+    }
+
+    // 选择目标
+    let selectedGoal = '减脂';
+    function selectGoal(goal, element) {
+        selectedGoal = goal;
+        element.parentElement.querySelectorAll('.segment-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        element.classList.add('active');
+    }
+
+    // 切换标签
+    function toggleTag(element) {
+        element.classList.toggle('active');
+    }
+
+    // 保存我的食谱设置
+    function saveMyMealPlan() {
+        const calories = document.getElementById('calorieSlider').value;
+        const preferences = Array.from(document.querySelectorAll('#page-myMealPlan .tag.active')).map(tag => tag.textContent);
+        
+        const mealPlan = {
+            calories: parseInt(calories),
+            mealCount: selectedMealCount,
+            goal: selectedGoal,
+            preferences: preferences,
+            isCustom: true,
+            createdAt: new Date().toISOString()
+        };
+        
+        localStorage.setItem('myMealPlan', JSON.stringify(mealPlan));
+        
+        // 更新显示
+        updateMealPlanDisplay(mealPlan);
+        showToast('食谱设置已保存！');
+    }
+
+    // 更新食谱显示
+    function updateMealPlanDisplay(plan) {
+        document.getElementById('currentCalories').textContent = plan.calories + ' kcal';
+        document.getElementById('currentMeals').textContent = plan.mealCount + '餐';
+        document.getElementById('currentGoal').textContent = plan.goal;
+        document.getElementById('planStatusText').textContent = plan.isCustom ? '自定义设置' : 'AI智能定制';
+        document.getElementById('planTypeLabel').textContent = plan.isCustom ? '自定义' : 'AI定制';
+        
+        // 显示预览区域
+        document.getElementById('emptyPlanState').style.display = 'none';
+        document.getElementById('mealPlanPreview').style.display = 'block';
+        
+        // 生成周食谱预览
+        generateWeekPreview(plan);
+    }
+
+    // 生成周食谱预览
+    function generateWeekPreview(plan) {
+        const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const meals = plan.mealCount;
+        const calories = plan.calories;
+        
+        let html = '';
+        weekDays.forEach((day, index) => {
+            const dayCalories = Math.round(calories / meals) * meals;
+            html += `
+                <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-xl">
+                    <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-sm">${day}</span>
+                    <div class="flex-1">
+                        <p class="text-sm text-gray-600">${meals}餐 · 约${dayCalories}kcal</p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('weekPlanList').innerHTML = html;
+    }
+
+    // 编辑食谱
+    function editMealPlan() {
+        showToast('请在上方调整设置，然后点击保存');
+        document.getElementById('contentArea').scrollTop = 0;
+    }
+
+    // ================= AI智能定制功能 =================
+
+    // 选择AI目标
+    let aiSelectedGoal = '减脂';
+    function selectAIGoal(goal, element) {
+        aiSelectedGoal = goal;
+        element.parentElement.querySelectorAll('.segment-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        element.classList.add('active');
+    }
+
+    // 切换AI页面标签
+    function toggleAITag(element) {
+        element.classList.toggle('active');
+    }
+
+    // 生成AI食谱
+    function generateAIPlan() {
+        showToast('AI正在分析您的数据...');
+        
+        // 模拟AI计算
+        setTimeout(() => {
+            // 基于目标计算推荐摄入量
+            let recommendedCalories = 2000;
+            switch(aiSelectedGoal) {
+                case '减脂': recommendedCalories = 1500; break;
+                case '增肌': recommendedCalories = 2500; break;
+                case '维持': recommendedCalories = 2000; break;
+            }
+            
+            const aiPreferences = Array.from(document.querySelectorAll('#page-mealPlanner .tag.active')).map(tag => tag.textContent);
+            
+            const aiPlan = {
+                calories: recommendedCalories,
+                mealCount: 3,
+                goal: aiSelectedGoal,
+                preferences: aiPreferences,
+                isCustom: false,
+                createdAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem('myMealPlan', JSON.stringify(aiPlan));
+            
+            showToast('AI食谱已生成！');
+            
+            // 返回我的食谱页面并刷新
+            switchTab('myMealPlan');
+            setTimeout(() => {
+                updateMealPlanDisplay(aiPlan);
+                // 更新滑块值
+                document.getElementById('calorieSlider').value = recommendedCalories;
+                document.getElementById('calorieValue').textContent = recommendedCalories + ' kcal';
+            }, 100);
+        }, 1500);
+    }
+
+    // 时间维度切换（旧版兼容）
+    function switchTimeView(element, view) {
+        switchAnalyticsTab(view === 'day' ? 'analytics' : view);
+    }
+
+    // 刷新首页AI建议
+    function refreshTip() {
+        const tipText = document.getElementById('dailyTipText');
+        const tipTypeLabel = document.getElementById('tipTypeLabel');
+        const tipCard = document.getElementById('dailyTipCard');
+        
+        // 检查是否有用户自定义提示
+        if (userTips.length > 0) {
+            // 随机显示用户自定义提示
+            const randomTip = userTips[Math.floor(Math.random() * userTips.length)];
+            tipText.textContent = randomTip;
+            tipTypeLabel.textContent = '我的提示';
+            tipCard.className = 'card bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100';
+        } else {
+            // 随机显示AI建议
+            const randomTip = aiTips[Math.floor(Math.random() * aiTips.length)];
+            tipText.textContent = randomTip;
+            tipTypeLabel.textContent = 'AI 智能建议';
+            tipCard.className = 'card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100';
+        }
+        
+        showToast('已刷新建议');
+    }
+
+    // 显示日期详情
+    function showDayDetail(date) {
+        showToast('查看 ' + date + ' 的详细记录');
+    }
+
+    // 显示周详情
+    function showWeekDetail(week) {
+        showToast('查看 ' + week + ' 的详细数据');
+    }
+
+    // 添加新提示
+    function addNewTip() {
+        const input = document.getElementById('newTipInput');
+        const tip = input.value.trim();
+        
+        if (!tip) {
+            showToast('请输入提示内容');
+            return;
+        }
+        
+        if (tip.length > 100) {
+            showToast('提示不能超过100字');
+            return;
+        }
+        
+        userTips.push(tip);
+        localStorage.setItem('userTips', JSON.stringify(userTips));
+        
+        input.value = '';
+        showToast('添加成功！首页将展示您的提示');
+        
+        // 刷新页面显示
+        location.reload();
+    }
+
+    // 快速添加提示
+    function quickAddTip(tip) {
+        userTips.push(tip);
+        localStorage.setItem('userTips', JSON.stringify(userTips));
+        showToast('已添加：' + tip);
+        setTimeout(() => location.reload(), 500);
+    }
+
+    // 主开关切换
+    function toggleMainSwitch() {
+        const btn = document.getElementById('mainToggle');
+        const isOn = btn.classList.contains('bg-green-500');
+        
+        if (isOn) {
+            btn.classList.remove('bg-green-500');
+            btn.classList.add('bg-gray-300');
+            btn.querySelector('span').style.transform = 'translateX(-20px)';
+            showToast('已关闭所有提醒');
+        } else {
+            btn.classList.remove('bg-gray-300');
+            btn.classList.add('bg-green-500');
+            btn.querySelector('span').style.transform = 'translateX(0)';
+            showToast('已开启所有提醒');
+        }
+    }
+
+    // Toast提示
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.remove('opacity-0');
+        toast.classList.add('opacity-100');
+        
+        setTimeout(() => {
+            toast.classList.remove('opacity-100');
+            toast.classList.add('opacity-0');
+        }, 2000);
+    }
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshTip();
+        updateProfileDisplay();
+        
+        // 加载保存的个人信息到设置页面
+        const profile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+        if (profile.avatar) {
+            document.getElementById('avatarPreview').textContent = profile.avatar;
+        }
+        if (profile.nickname) {
+            document.getElementById('nicknameInput').value = profile.nickname;
+        }
+        if (profile.bio) {
+            document.getElementById('bioInput').value = profile.bio;
+        }
+        
+        // 加载保存的食谱设置
+        const mealPlan = JSON.parse(localStorage.getItem('myMealPlan') || '{}');
+        if (mealPlan.calories) {
+            // 更新显示
+            if (document.getElementById('currentCalories')) {
+                updateMealPlanDisplay(mealPlan);
+            }
+            // 更新设置页面的值
+            const calorieSlider = document.getElementById('calorieSlider');
+            if (calorieSlider) {
+                calorieSlider.value = mealPlan.calories;
+                document.getElementById('calorieValue').textContent = mealPlan.calories + ' kcal';
+            }
+        }
+    });
+
+    // 添加触摸反馈
+    document.querySelectorAll('.card, .tag, button').forEach(el => {
+        el.addEventListener('touchstart', function() {
+            if (this.style.transform !== 'scale(0.98)') {
+                this.dataset.originalTransform = this.style.transform || '';
+            }
+            this.style.transform = 'scale(0.98)';
+        });
+        el.addEventListener('touchend', function() {
+            this.style.transform = this.dataset.originalTransform || '';
+        });
+    });
+</script>
+
+</body>
+</html>
