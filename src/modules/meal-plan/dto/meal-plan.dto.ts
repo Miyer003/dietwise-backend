@@ -75,11 +75,10 @@ export class CreateMealPlanDto {
   @IsString()
   healthGoal: string;
 
-  @ApiProperty({ description: '口味偏好', example: ['清淡', '少油'], required: false })
+  @ApiProperty({ description: '口味偏好', example: ['清淡', '少油'] })
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
-  flavorPrefs?: string[];
+  flavorPrefs: string[];
 
   @ApiProperty({ description: '食谱明细', type: [MealPlanDayDto], required: false })
   @IsArray()
@@ -90,26 +89,22 @@ export class CreateMealPlanDto {
 }
 
 export class GenerateMealPlanDto {
-  @ApiProperty({ description: '每日热量目标', example: 2000, required: false })
+  @ApiProperty({ description: '每日热量目标', example: 2000 })
   @IsNumber()
-  @IsOptional()
-  calorieTarget?: number;
+  calorieTarget: number;
 
-  @ApiProperty({ description: '每日餐次数', example: 3, required: false })
+  @ApiProperty({ description: '每日餐次数', example: 3 })
   @IsNumber()
-  @IsOptional()
-  mealCount?: number;
+  mealCount: number;
 
-  @ApiProperty({ description: '健康目标', example: '减脂', required: false })
+  @ApiProperty({ description: '健康目标', example: '减脂' })
   @IsString()
-  @IsOptional()
-  healthGoal?: string;
+  healthGoal: string;
 
-  @ApiProperty({ description: '口味偏好', example: ['清淡', '少油'], required: false })
+  @ApiProperty({ description: '口味偏好', example: ['清淡', '少油'] })
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
-  flavorPrefs?: string[];
+  flavorPrefs: string[];
 
   @ApiProperty({ description: '身高(cm)', example: 175, required: false })
   @IsNumber()

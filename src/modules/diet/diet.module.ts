@@ -5,11 +5,10 @@ import { DietController } from './diet.controller';
 import { DietRecord } from './entities/diet-record.entity';
 import { DietRecordItem } from './entities/diet-record-item.entity';
 import { AIModule } from '../../shared/ai/ai.module';
-import { RedisModule } from '../../shared/redis/redis.module';
-import { MinioModule } from '../../shared/minio/minio.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DietRecord, DietRecordItem]), AIModule, RedisModule, MinioModule],
+  imports: [TypeOrmModule.forFeature([DietRecord, DietRecordItem]), AIModule, UserModule],
   controllers: [DietController],
   providers: [DietService],
   exports: [DietService],

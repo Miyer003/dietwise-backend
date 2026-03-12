@@ -19,12 +19,35 @@ export class DietController {
   @ApiOperation({ summary: '查询记录列表' })
   @ApiQuery({ name: 'date', required: false })
   @ApiQuery({ name: 'mealType', required: false })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'limit', required: false })
   async getRecords(
     @CurrentUser('userId') userId: string,
     @Query('date') date?: string,
     @Query('mealType') mealType?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: number,
   ) {
-    return this.dietService.getRecords(userId, date || '', mealType);
+    const records = await this.dietService.getRecords(userId, date || '', mealType);
+    // 简单的分页处理
+    const pageSize = limit || 20;
+    let filteredRecords = records;
+    
+    if (cursor) {
+      const cursorIndex = records.findIndex(r => r.id === cursor);
+      if (cursorIndex !== -1) {
+        filteredRecords = records.slice(cursorIndex + 1);
+      }
+    }
+    
+    const paginatedRecords = filteredRecords.slice(0, pageSize);
+    const hasMore = filteredRecords.length > pageSize;
+    
+    return {
+      records: paginatedRecords,
+      cursor: paginatedRecords.length > 0 ? paginatedRecords[paginatedRecords.length - 1].id : undefined,
+      hasMore,
+    };
   }
 
   @Get('records/:id')

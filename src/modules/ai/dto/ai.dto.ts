@@ -38,3 +38,55 @@ export class GenerateTipDto {
   @IsOptional()
   forceAI?: boolean;
 }
+
+export class GenerateMealPlanDto {
+  @ApiProperty({ description: '每日热量目标(kcal)', example: 2000, required: false })
+  @IsNumber()
+  @IsOptional()
+  calorieTarget?: number;
+
+  @ApiProperty({ description: '每日餐数', example: 3, required: false })
+  @IsNumber()
+  @IsOptional()
+  mealCount?: number;
+
+  @ApiProperty({ description: '健康目标', enum: ['减脂', '增肌', '维持'], required: false })
+  @IsString()
+  @IsOptional()
+  healthGoal?: string;
+
+  @ApiProperty({ description: '口味偏好', type: [String], required: false })
+  @IsOptional()
+  flavorPrefs?: string[];
+
+  @ApiProperty({ description: '身高(cm)', required: false })
+  @IsNumber()
+  @IsOptional()
+  heightCm?: number;
+
+  @ApiProperty({ description: '体重(kg)', required: false })
+  @IsNumber()
+  @IsOptional()
+  weightKg?: number;
+
+  @ApiProperty({ description: '使用AI生成', default: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  useAI?: boolean;
+}
+
+export class ChatDto {
+  @ApiProperty({ description: '会话ID（新会话不传）', required: false })
+  @IsString()
+  @IsOptional()
+  sessionId?: string;
+
+  @ApiProperty({ description: '用户消息' })
+  @IsString()
+  message: string;
+
+  @ApiProperty({ description: '是否包含上下文（饮食数据）', default: false, required: false })
+  @IsBoolean()
+  @IsOptional()
+  includeContext?: boolean;
+}

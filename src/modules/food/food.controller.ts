@@ -36,16 +36,16 @@ export class FoodController {
     return this.foodService.getRecent(userId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: '获取食物详情' })
-  async getById(@Param('id') id: string) {
-    return this.foodService.findById(id);
-  }
-
   @Get('semantic/search')
   @ApiOperation({ summary: '语义搜索（RAG）' })
   @ApiQuery({ name: 'q', description: '查询文本', required: true })
   async semanticSearch(@Query('q') query: string) {
     return this.foodService.semanticSearch(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: '获取食物详情' })
+  async getById(@Param('id') id: string) {
+    return this.foodService.findById(id);
   }
 }

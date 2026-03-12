@@ -7,6 +7,7 @@ import { CreateDietRecordDto, UpdateDietRecordDto } from './dto/create-diet-reco
 import { AIService } from '../../shared/ai/ai.service';
 import { RedisService } from '../../shared/redis/redis.service';
 import { MinioService } from '../../shared/minio/minio.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class DietService {
@@ -18,6 +19,7 @@ export class DietService {
     private readonly aiService: AIService,
     private readonly redisService: RedisService,
     private readonly minioService: MinioService,
+    private readonly userService: UserService,
   ) {}
 
   // 获取饮食记录列表
@@ -207,8 +209,9 @@ export class DietService {
       order: { createdAt: 'ASC' },
     });
 
-    // 获取用户每日目标（简化实现）
-    const goal = 2000; // TODO: 从user_profile获取
+    // 获取用户每日目标
+    const profile = await this.userService.getProfile(userId).catch(() => null);
+    const goal = profile?.dailyCalorieGoal || 2000;
 
     const fiberG = records.reduce((sum, r) => 
       sum + r.items.reduce((itemSum, item) => itemSum + Number(item.fiberG || 0), 0), 0);
@@ -283,10 +286,21 @@ export class DietService {
       });
     }
 
+    const avgCalories = days.reduce((sum, d) => sum + d.calories, 0) / 7;
+    const compliantDays = days.filter(d => d.calories > 1200 && d.calories < 2500).length;
+    
     return {
       weekStart,
-      days,
-      averageCalories: days.reduce((sum, d) => sum + d.calories, 0) / 7,
+      weekEnd: end.toISOString().split('T')[0],
+      avgDailyCalories: avgCalories,
+      totalDays: 7,
+      compliantDays,
+      healthScore: Math.min(100, Math.round((compliantDays / 7) * 100)),
+      dailyTrends: days.map(d => ({
+        date: d.date,
+        calories: d.calories,
+        isCompliant: d.calories > 1200 && d.calories < 2500,
+      })),
     };
   }
 
@@ -306,12 +320,52 @@ export class DietService {
     const totalCalories = records.reduce((sum, r) => sum + Number(r.totalCalories), 0);
     const daysWithRecords = new Set(records.map(r => r.recordDate.toISOString().split('T')[0])).size;
 
+    const avgDailyCalories = daysWithRecords > 0 ? totalCalories / daysWithRecords : 0;
+    const compliantDays = daysWithRecords; // 简化计算
+
+    // 计算每周趋势
+    const weeklyTrends = this.calculateWeeklyTrends(records, year, monthNum);
+    
     return {
       month,
-      totalRecords: records.length,
-      daysWithRecords,
-      averageDailyCalories: daysWithRecords > 0 ? totalCalories / daysWithRecords : 0,
+      avgDailyCalories,
+      totalDays: end.getDate(),
+      compliantDays,
+      healthScore: Math.min(100, Math.round((compliantDays / end.getDate()) * 100)),
+      weeklyTrends,
     };
+  }
+
+  // 计算每周趋势
+  private calculateWeeklyTrends(
+    records: DietRecord[],
+    year: number,
+    month: number,
+  ): Array<{ week: number; avgCalories: number }> {
+    if (records.length === 0) return [];
+
+    // 按周分组计算平均热量
+    const weeklyMap = new Map<number, { total: number; count: number }>();
+
+    for (const record of records) {
+      const date = new Date(record.recordDate);
+      const dayOfMonth = date.getDate();
+      // 计算属于第几周（向上取整）
+      const weekNum = Math.ceil(dayOfMonth / 7);
+      
+      const existing = weeklyMap.get(weekNum) || { total: 0, count: 0 };
+      existing.total += Number(record.totalCalories);
+      existing.count += 1;
+      weeklyMap.set(weekNum, existing);
+    }
+
+    // 转换为数组并排序
+    return Array.from(weeklyMap.entries())
+      .map(([week, data]) => ({
+        week,
+        avgCalories: Math.round(data.total / data.count),
+      }))
+      .sort((a, b) => a.week - b.week);
   }
 
   private calculateHealthScore(records: DietRecord[], goal: number): number {

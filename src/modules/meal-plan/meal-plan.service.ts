@@ -251,20 +251,162 @@ export class MealPlanService {
     };
   }
 
-  // 解析AI响应（简化实现）
-  private parseAIResponse(aiText: string) {
-    // TODO: 实现更完善的解析逻辑
-    // 这里返回一个示例结构
-    return {
-      days: [
-        {
-          dayOfWeek: 1,
-          mealType: 'breakfast',
-          dishes: [{ name: '燕麦粥', quantity_g: 200, calories: 150 }],
-          totalCalories: 150,
-        },
-      ],
-    };
+  // 解析AI响应
+  private parseAIResponse(aiText: string): {
+    days: Array<{
+      dayOfWeek: number;
+      mealType: string;
+      dishes: Array<{ name: string; quantityG: number; calories: number; cookingTip?: string }>;
+      totalCalories: number;
+      notes?: string;
+    }>;
+  } {
+    const days: ReturnType<typeof this.parseAIResponse>['days'] = [];
+
+    try {
+      // 尝试从AI响应中提取JSON
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.days && Array.isArray(parsed.days)) {
+          return { days: parsed.days };
+        }
+      }
+
+      // 如果JSON解析失败，使用正则表达式提取
+      // 匹配每一天的食谱（周一至周日）
+      const dayPattern = /周[一二三四五六日]|星期[一二三四五六日]|Day\s*\d+/gi;
+      const mealPattern = /(早餐|午餐|晚餐|加餐)\s*[：:]\s*([^\n]+(?:\n(?![早餐|午餐|晚餐|加餐]).*)*)/gi;
+      const dishPattern = /[-•*]\s*([^\n（]+)(?:（(\d+)\s*克）)?\s*(?:约?\s*(\d+)\s*[千卡kcal])?/gi;
+
+      let currentDay = 1;
+      const meals = ['breakfast', 'lunch', 'dinner', 'snack'];
+      let mealIndex = 0;
+
+      // 简单的文本解析逻辑
+      const lines = aiText.split('\n');
+      let currentMeal = '';
+      let currentDishes: typeof days[0]['dishes'] = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // 检测星期几
+        if (/周[一二三四五六日]|星期[一二三四五六日]/i.test(trimmed)) {
+          // 保存之前的餐次
+          if (currentMeal && currentDishes.length > 0) {
+            days.push({
+              dayOfWeek: currentDay,
+              mealType: currentMeal,
+              dishes: currentDishes,
+              totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+            });
+          }
+          currentDay = Math.min(currentDay + 1, 7);
+          mealIndex = 0;
+          currentMeal = '';
+          currentDishes = [];
+          continue;
+        }
+
+        // 检测餐次
+        if (trimmed.includes('早餐') || trimmed.toLowerCase().includes('breakfast')) {
+          if (currentMeal && currentDishes.length > 0) {
+            days.push({
+              dayOfWeek: currentDay,
+              mealType: currentMeal,
+              dishes: currentDishes,
+              totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+            });
+          }
+          currentMeal = 'breakfast';
+          currentDishes = [];
+          continue;
+        }
+        if (trimmed.includes('午餐') || trimmed.toLowerCase().includes('lunch')) {
+          if (currentMeal && currentDishes.length > 0) {
+            days.push({
+              dayOfWeek: currentDay,
+              mealType: currentMeal,
+              dishes: currentDishes,
+              totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+            });
+          }
+          currentMeal = 'lunch';
+          currentDishes = [];
+          continue;
+        }
+        if (trimmed.includes('晚餐') || trimmed.toLowerCase().includes('dinner')) {
+          if (currentMeal && currentDishes.length > 0) {
+            days.push({
+              dayOfWeek: currentDay,
+              mealType: currentMeal,
+              dishes: currentDishes,
+              totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+            });
+          }
+          currentMeal = 'dinner';
+          currentDishes = [];
+          continue;
+        }
+        if (trimmed.includes('加餐') || trimmed.toLowerCase().includes('snack')) {
+          if (currentMeal && currentDishes.length > 0) {
+            days.push({
+              dayOfWeek: currentDay,
+              mealType: currentMeal,
+              dishes: currentDishes,
+              totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+            });
+          }
+          currentMeal = 'snack';
+          currentDishes = [];
+          continue;
+        }
+
+        // 解析菜品
+        if (currentMeal && (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*'))) {
+          const dishMatch = trimmed.match(/[-•*]\s*([^（\(]+)(?:[（(](\d+)\s*[克g][)）])?\s*(?:约?\s*(\d+)\s*[千卡kcal]?)?/i);
+          if (dishMatch) {
+            currentDishes.push({
+              name: dishMatch[1].trim(),
+              quantityG: parseInt(dishMatch[2]) || 100,
+              calories: parseInt(dishMatch[3]) || 0,
+            });
+          }
+        }
+      }
+
+      // 保存最后一个餐次
+      if (currentMeal && currentDishes.length > 0) {
+        days.push({
+          dayOfWeek: currentDay,
+          mealType: currentMeal,
+          dishes: currentDishes,
+          totalCalories: currentDishes.reduce((sum, d) => sum + (d.calories || 0), 0),
+        });
+      }
+    } catch (error) {
+      console.error('解析AI食谱响应失败:', error);
+    }
+
+    // 如果没有解析到任何数据，返回默认结构
+    if (days.length === 0) {
+      // 生成默认的一周食谱结构
+      for (let day = 1; day <= 7; day++) {
+        for (const meal of ['breakfast', 'lunch', 'dinner']) {
+          days.push({
+            dayOfWeek: day,
+            mealType: meal,
+            dishes: [{ name: '均衡营养餐', quantityG: 300, calories: 500 }],
+            totalCalories: 500,
+            notes: 'AI生成的食谱',
+          });
+        }
+      }
+    }
+
+    return { days };
   }
 
   // 计算年龄

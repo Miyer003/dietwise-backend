@@ -87,5 +87,5 @@ export class UpdateNotificationSettingsDto {
 export class PushTokenDto {
   @ApiProperty({ description: 'Expo Push Token' })
   @IsString()
-  token: string;
+  expoPushToken: string;
 }

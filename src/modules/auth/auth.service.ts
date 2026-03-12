@@ -83,7 +83,13 @@ export class AuthService {
     // TODO: 调用实际的短信服务发送验证码
     console.log(`[SMS] 发送验证码 ${code} 到 ${phone}`);
 
-    return { message: '验证码已发送', expireIn: 300 };
+    // 开发环境返回验证码，方便测试
+    const isDev = process.env.NODE_ENV !== 'production';
+    return { 
+      message: '验证码已发送', 
+      expireIn: 300,
+      ...(isDev && { code })  // 开发环境返回验证码
+    };
   }
 
   // 验证码登录

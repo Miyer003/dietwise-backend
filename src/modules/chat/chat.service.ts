@@ -209,21 +209,25 @@ export class ChatService {
     const startTime = Date.now();
 
     try {
-      // TODO: 实现真正的流式调用
-      // 这里先用非流式模拟
-      const aiResponse = await this.aiService.chat(messages);
-      fullContent = aiResponse;
-
-      // 模拟流式输出
-      const chunks = aiResponse.split('');
-      for (const chunk of chunks) {
-        callbacks.onDelta(chunk);
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-
-      callbacks.onComplete(fullContent);
+      // 使用真正的流式接口
+      await this.aiService.chatStream(
+        messages,
+        {
+          onDelta: (delta: string) => {
+            fullContent += delta;
+            callbacks.onDelta(delta);
+          },
+          onComplete: (content: string) => {
+            fullContent = content;
+            callbacks.onComplete(content);
+          },
+          onError: (error: Error) => {
+            callbacks.onError(error);
+          },
+        }
+      );
     } catch (error) {
-      callbacks.onError(error);
+      callbacks.onError(error as Error);
       return;
     }
 
@@ -243,6 +247,39 @@ export class ChatService {
     // 更新会话统计
     await this.sessionRepo.update(sessionId, {
       messageCount: session.messages.length + 2,
+      lastMessageAt: new Date(),
+    });
+  }
+
+  // 保存消息（简化接口，供AI Controller使用）
+  async saveMessage(
+    sessionId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    userId?: string,
+  ) {
+    const message = this.messageRepo.create({
+      sessionId,
+      userId,
+      role: role === 'user' ? MessageRole.USER : MessageRole.ASSISTANT,
+      content,
+    });
+    return this.messageRepo.save(message);
+  }
+
+  // 获取会话消息列表
+  async getMessages(sessionId: string) {
+    return this.messageRepo.find({
+      where: { sessionId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  // 更新会话消息数
+  async updateMessageCount(sessionId: string) {
+    const count = await this.messageRepo.count({ where: { sessionId } });
+    await this.sessionRepo.update(sessionId, {
+      messageCount: count,
       lastMessageAt: new Date(),
     });
   }

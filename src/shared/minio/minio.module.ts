@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
+import { MinioService } from './minio.service';
+import { MINIO_CLIENT } from './minio.constants';
 
-export const MINIO_CLIENT = 'MINIO_CLIENT';
-
+@Global()
 @Module({
   providers: [
     {
@@ -19,7 +20,8 @@ export const MINIO_CLIENT = 'MINIO_CLIENT';
       },
       inject: [ConfigService],
     },
+    MinioService,
   ],
-  exports: [MINIO_CLIENT],
+  exports: [MINIO_CLIENT, MinioService],
 })
 export class MinioModule {}

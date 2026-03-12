@@ -7,15 +7,13 @@ export class PushSyncDto {
   @IsString()
   deviceId: string;
 
-  @ApiProperty({ description: '离线饮食记录', type: [CreateDietRecordDto], required: false })
+  @ApiProperty({ description: '离线饮食记录', type: [CreateDietRecordDto] })
   @IsArray()
-  @IsOptional()
-  records?: CreateDietRecordDto[];
+  records: CreateDietRecordDto[];
 
-  @ApiProperty({ description: '自定义提示', required: false })
+  @ApiProperty({ description: '自定义提示' })
   @IsArray()
-  @IsOptional()
-  tips?: any[];
+  tips: any[];
 
   @ApiProperty({ description: '提醒设置', required: false })
   @IsOptional()

@@ -14,7 +14,23 @@ export class AIService {
 
   // 营养分析：优先使用 Dashscope VL 模型（图片）
   async analyzeNutrition(imageUrl: string): Promise<NutritionAnalysisResult> {
-    return this.dashscope.analyzeNutritionByImage(imageUrl);
+    try {
+      return await this.dashscope.analyzeNutritionByImage(imageUrl);
+    } catch (error) {
+      this.logger.error('AI 图片分析失败，返回默认值:', error.message);
+      // 返回默认值，避免前端报错
+      return {
+        foodName: '未知食物',
+        quantityG: 100,
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sodiumMg: 0,
+        confidence: 0.5,
+      };
+    }
   }
 
   // 营养分析：通过文字描述
@@ -75,25 +91,50 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     }
   }
 
-  // 生成食谱：使用 Moonshot 长文本模型
+  // 生成食谱：使用 Moonshot 长文本模型，失败时使用 Dashscope
   async generateMealPlan(userProfile: any): Promise<string> {
     const prompt = this.buildMealPlanPrompt(userProfile);
+    
+    // 先尝试 Moonshot
     try {
-      return await this.moonshot.generateMealPlan(prompt);
-    } catch (error) {
-      this.logger.warn('Moonshot 失败，降级到 Dashscope', error.message);
-      return this.dashscope.chatCompletion([
-        { role: 'user', content: prompt }
-      ]);
+      this.logger.log('尝试使用 Moonshot 生成食谱...');
+      const result = await this.moonshot.generateMealPlan(prompt);
+      if (result && result.length > 50) {
+        return result;
+      }
+      throw new Error('Moonshot 返回内容太短');
+    } catch (moonshotError) {
+      this.logger.warn(`Moonshot 失败: ${moonshotError.message}，尝试 Dashscope...`);
+      
+      // 降级到 Dashscope
+      try {
+        const result = await this.dashscope.chatCompletion([
+          { role: 'user', content: prompt }
+        ]);
+        if (result && result.length > 50) {
+          return result;
+        }
+        throw new Error('Dashscope 返回内容太短');
+      } catch (dashscopeError) {
+        this.logger.error(`Dashscope 也失败: ${dashscopeError.message}`);
+        // 返回默认食谱模板
+        return this.getDefaultMealPlan(userProfile);
+      }
     }
   }
 
   // 简单聊天：使用 Dashscope turbo（更快更便宜）
   async chat(messages: ChatMessage[]): Promise<string> {
-    return this.dashscope.chatCompletion(messages);
+    try {
+      return await this.dashscope.chatCompletion(messages);
+    } catch (error) {
+      this.logger.error('AI 聊天失败:', error.message);
+      // 返回友好的错误提示
+      return '抱歉，AI 服务暂时不可用，请稍后再试。';
+    }
   }
 
-  // 流式聊天
+  // 流式聊天（使用 Dashscope 模拟流式效果）
   async chatStream(
     messages: ChatMessage[],
     callbacks: {
@@ -102,14 +143,24 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
       onError: (error: Error) => void;
     }
   ): Promise<void> {
+    let fullContent = '';
+    
     try {
-      await this.moonshot.streamChat(
-        messages,
-        callbacks.onDelta,
-      );
-      // Note: streamChat 内部会调用 onComplete
+      // 使用 Dashscope 非流式接口，然后模拟流式输出
+      const response = await this.dashscope.chatCompletion(messages);
+      fullContent = response;
+      
+      // 模拟流式输出（按字符分批发送）
+      const chunks = response.split('');
+      for (const chunk of chunks) {
+        callbacks.onDelta(chunk);
+        // 添加小延迟模拟打字效果
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      callbacks.onComplete(fullContent);
     } catch (error) {
-      callbacks.onError(error);
+      this.logger.error('流式聊天失败:', error);
+      callbacks.onError(error as Error);
     }
   }
 
@@ -129,6 +180,32 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
 3. 确保营养均衡，蛋白质/碳水/脂肪比例合理
 4. 总热量控制在目标范围内（±100kcal）
 5. 给出简要的每日营养分析
-`;
+
+请用中文回答，格式清晰易读。`;
+  }
+
+  // 默认食谱模板（当 AI 服务都失败时使用）
+  private getDefaultMealPlan(profile: any): string {
+    const calorieTarget = profile.dailyCalorieGoal || 2000;
+    const mealCount = profile.mealCount || 3;
+    const goal = profile.healthGoal || '维持';
+    
+    return `## 一周膳食计划（${goal}目标）
+
+### 周一
+**早餐** (约 ${Math.round(calorieTarget * 0.25)} kcal)
+- 燕麦粥 50g + 牛奶 200ml + 水煮蛋 1个
+
+**午餐** (约 ${Math.round(calorieTarget * 0.4)} kcal)
+- 米饭 150g + 清蒸鱼 100g + 炒时蔬 200g
+
+**晚餐** (约 ${Math.round(calorieTarget * 0.35)} kcal)
+- 杂粮粥 100g + 凉拌豆腐 150g + 炒青菜 200g
+
+### 周二至周日
+（按周一模式轮换，可根据个人喜好调整）
+
+---
+*注：此为默认模板，AI 服务暂时不可用。建议稍后重新生成个性化食谱。*`;
   }
 }

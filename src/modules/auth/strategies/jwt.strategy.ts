@@ -17,7 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     } as any);
   }
 
-  async validate(req: any, payload: any) {
+  async validate(payload: any) {
     // 检查 Token 是否在黑名单
     const isBlacklisted = await this.redisService.get(`jwt:blacklist:${payload.jti}`);
     if (isBlacklisted) {

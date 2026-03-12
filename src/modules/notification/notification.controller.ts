@@ -42,7 +42,7 @@ export class NotificationController {
     @CurrentUser('userId') userId: string,
     @Body() dto: PushTokenDto,
   ) {
-    await this.notificationService.savePushToken(userId, dto.token);
+    await this.notificationService.savePushToken(userId, dto.expoPushToken);
     return { message: 'Token已注册' };
   }
 }

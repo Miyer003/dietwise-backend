@@ -1,6 +1,7 @@
-import { Controller, Get, Patch, Put, Delete, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Patch, Put, Delete, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UserService } from './user.service';
+import { AchievementService } from '../achievement/achievement.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UpdateUserDto, UpdateUserProfileDto } from './dto/user.dto';
@@ -10,7 +11,10 @@ import { UpdateUserDto, UpdateUserProfileDto } from './dto/user.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly achievementService: AchievementService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: '获取当前用户信息' })
@@ -53,5 +57,31 @@ export class UserController {
   async deleteAccount(@CurrentUser('userId') userId: string) {
     await this.userService.delete(userId);
     return { message: '账号已注销' };
+  }
+
+  @Get('me/achievements')
+  @ApiOperation({ summary: '获取成就徽章列表' })
+  @ApiQuery({ name: 'status', required: false, enum: ['all', 'new'] })
+  async getAchievements(
+    @CurrentUser('userId') userId: string,
+    @Query('status') status?: string,
+  ) {
+    if (status === 'new') {
+      return this.achievementService.getNew(userId);
+    }
+    return this.achievementService.getAll(userId);
+  }
+
+  @Get('me/achievements/new')
+  @ApiOperation({ summary: '获取新解锁成就' })
+  async getNewAchievements(@CurrentUser('userId') userId: string) {
+    return this.achievementService.getNew(userId);
+  }
+
+  @Patch('me/achievements/read')
+  @ApiOperation({ summary: '标记成就为已读' })
+  async markAchievementsRead(@CurrentUser('userId') userId: string) {
+    await this.achievementService.markAsRead(userId);
+    return { message: '已标记为已读' };
   }
 }

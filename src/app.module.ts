@@ -18,7 +18,7 @@ import { AchievementModule } from './modules/achievement/achievement.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SyncModule } from './modules/sync/sync.module';
-import { AIController } from './modules/ai/ai.controller';
+import { AIModule as AIFeatureModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
@@ -37,7 +37,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
         database: config.get('app.database.database'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get('app.database.synchronize'),
-        logging: config.get('app.nodeEnv') === 'development',
+        logging: config.get('app.database.logging') || false,
       }),
       inject: [ConfigService],
     }),
@@ -56,8 +56,9 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     FeedbackModule,
     AdminModule,
     SyncModule,
+    AIFeatureModule,
   ],
-  controllers: [AIController],
+  controllers: [],
   providers: [
     // 全局JWT认证守卫
     {

@@ -52,8 +52,7 @@ class DietRecordItemDto {
 export class CreateDietRecordDto {
   @ApiProperty({ description: '记录日期', example: '2025-01-15' })
   @IsDateString()
-  @IsOptional()
-  recordDate?: string;
+  recordDate: string;
 
   @ApiProperty({ description: '餐次类型', enum: MealType, example: 'lunch' })
   @IsEnum(MealType)
@@ -87,8 +86,7 @@ export class CreateDietRecordDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => DietRecordItemDto)
-  @IsOptional()
-  items?: DietRecordItemDto[];
+  items: DietRecordItemDto[];
 }
 
 export class UpdateDietRecordDto {
@@ -101,4 +99,11 @@ export class UpdateDietRecordDto {
   @IsNumber()
   @IsOptional()
   portionFactor?: number;
+
+  @ApiProperty({ description: '食物明细', type: [DietRecordItemDto], required: false })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DietRecordItemDto)
+  @IsOptional()
+  items?: DietRecordItemDto[];
 }

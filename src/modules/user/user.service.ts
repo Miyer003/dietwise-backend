@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { User, UserStatus } from './entities/user.entity';
 import { UserProfile } from './entities/user-profile.entity';
 import { UpdateUserDto, UpdateUserProfileDto } from './dto/user.dto';
+import { DietRecord } from '../diet/entities/diet-record.entity';
 
 @Injectable()
 export class UserService {
@@ -12,6 +13,8 @@ export class UserService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(UserProfile)
     private readonly profileRepo: Repository<UserProfile>,
+    @InjectRepository(DietRecord)
+    private readonly dietRecordRepo: Repository<DietRecord>,
   ) {}
 
   // 创建用户
@@ -203,11 +206,72 @@ export class UserService {
       throw new NotFoundException('用户不存在');
     }
 
-    // 这里可以添加更多统计，比如连续打卡天数等
+    // 获取总记录数
+    const totalRecords = await this.dietRecordRepo.count({
+      where: { userId },
+    });
+
+    // 计算连续打卡天数
+    const streakDays = await this.calculateStreakDays(userId);
+
+    // 计算加入天数
+    const joinDays = Math.floor(
+      (new Date().getTime() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
     return {
-      totalRecords: 0, // TODO: 从diet_records表查询
-      streakDays: 0,   // TODO: 计算连续打卡天数
+      totalRecords,
+      streakDays,
+      joinDays,
       joinDate: user.createdAt,
     };
+  }
+
+  // 计算连续打卡天数
+  private async calculateStreakDays(userId: string): Promise<number> {
+    const records = await this.dietRecordRepo.find({
+      where: { userId },
+      order: { recordDate: 'DESC' },
+      select: ['recordDate'],
+    });
+
+    if (records.length === 0) {
+      return 0;
+    }
+
+    // 获取唯一日期列表
+    const uniqueDates = [...new Set(records.map(r => 
+      new Date(r.recordDate).toISOString().split('T')[0]
+    ))].sort().reverse();
+
+    if (uniqueDates.length === 0) {
+      return 0;
+    }
+
+    // 检查今天或昨天是否有记录
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+      return 0; // 最近没有记录
+    }
+
+    // 计算连续天数
+    let streak = 1;
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const currentDate = new Date(uniqueDates[i - 1]);
+      const prevDate = new Date(uniqueDates[i]);
+      const diffDays = Math.floor(
+        (currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
+      if (diffDays === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
   }
 }
