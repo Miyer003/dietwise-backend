@@ -109,10 +109,28 @@ export class GenerateMealPlanDto {
   @ApiProperty({ description: '身高(cm)', example: 175, required: false })
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   heightCm?: number;
 
   @ApiProperty({ description: '体重(kg)', example: 65, required: false })
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   weightKg?: number;
+
+  @ApiProperty({ description: '饮食限制/忌口', example: ['无麸质', '无海鲜'], required: false })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  restrictions?: string[];
+
+  @ApiProperty({ description: '自定义要求', example: '希望多安排鱼类，不喜欢胡萝卜', required: false })
+  @IsString()
+  @IsOptional()
+  customRequest?: string;
+
+  @ApiProperty({ description: '烹饪难度', enum: ['简单', '中等', '复杂'], required: false })
+  @IsString()
+  @IsOptional()
+  cookingDifficulty?: string;
 }

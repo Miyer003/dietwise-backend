@@ -143,10 +143,14 @@ export class MealPlanService {
       allergyTags: profile.allergyTags || [],
       age: this.calculateAge(profile.birthDate),
       gender: profile.gender,
+      // 高级设置
+      restrictions: (dto as any).restrictions || [],
+      cookingDifficulty: (dto as any).cookingDifficulty,
     };
 
-    // 调用AI生成食谱
-    const aiResult = await this.aiService.generateMealPlan(userProfile);
+    // 调用AI生成食谱，传递自定义要求
+    const customRequest = (dto as any).customRequest;
+    const aiResult = await this.aiService.generateMealPlan(userProfile, customRequest);
 
     // 解析AI返回的食谱数据（简化实现）
     const parsedPlan = this.parseAIResponse(aiResult);
@@ -289,24 +293,36 @@ export class MealPlanService {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
           
-          // 处理新的结构化格式 { days: [{ dayOfWeek, meals: [...] }] }
+          // 处理新的结构化格式 { days: [{ dayOfWeek, meals: [...], dailyNutrition }] }
           if (parsed.days && Array.isArray(parsed.days)) {
             for (const day of parsed.days) {
               if (day.meals && Array.isArray(day.meals)) {
                 for (const meal of day.meals) {
                   const dishes = (meal.dishes || []).map((d: any) => ({
                     name: d.name || '未知菜品',
-                    quantityG: parseInt(d.quantityG) || 100,
+                    quantity_g: parseInt(d.quantityG || d.quantity_g) || 100,
                     calories: parseInt(d.calories) || 0,
-                    cookingTip: d.cookingTip || '',
+                    protein_g: parseFloat(d.proteinG || d.protein_g) || 0,
+                    carbs_g: parseFloat(d.carbsG || d.carbs_g) || 0,
+                    fat_g: parseFloat(d.fatG || d.fat_g) || 0,
+                    cooking_tip: d.cookingTip || d.cooking_tip || '',
                   }));
+                  
+                  // 构建营养信息字符串
+                  let nutritionNotes = '';
+                  if (day.dailyNutrition) {
+                    const { proteinG, carbsG, fatG, proteinPercent, carbsPercent, fatPercent } = day.dailyNutrition;
+                    nutritionNotes = `蛋白质:${proteinG}g (${proteinPercent}%) 碳水:${carbsG}g (${carbsPercent}%) 脂肪:${fatG}g (${fatPercent}%)`;
+                  } else if (meal.mealProtein || meal.mealCarbs || meal.mealFat) {
+                    nutritionNotes = `本餐 蛋白质:${meal.mealProtein || 0}g 碳水:${meal.mealCarbs || 0}g 脂肪:${meal.mealFat || 0}g`;
+                  }
                   
                   days.push({
                     dayOfWeek: day.dayOfWeek || 1,
                     mealType: meal.mealType || 'breakfast',
                     dishes,
                     totalCalories: parseInt(meal.mealCalories) || dishes.reduce((sum: number, d: any) => sum + (d.calories || 0), 0),
-                    notes: day.nutrition ? `蛋白质:${day.nutrition.proteinG}g 碳水:${day.nutrition.carbsG}g 脂肪:${day.nutrition.fatG}g` : '',
+                    notes: nutritionNotes,
                   });
                 }
               }

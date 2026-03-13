@@ -113,8 +113,8 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
   }
 
   // 生成食谱：优先使用 Dashscope (Qwen)，失败时使用 Moonshot (Kimi)
-  async generateMealPlan(userProfile: any): Promise<string> {
-    const prompt = this.buildMealPlanPrompt(userProfile);
+  async generateMealPlan(userProfile: any, customRequest?: string): Promise<string> {
+    const prompt = this.buildMealPlanPrompt(userProfile, customRequest);
     
     // 先尝试 Dashscope (Qwen)
     try {
@@ -192,22 +192,36 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     }
   }
 
-  private buildMealPlanPrompt(profile: any): string {
+  private buildMealPlanPrompt(profile: any, customRequest?: string): string {
+    const difficultyHint = profile.cookingDifficulty ? 
+      `烹饪难度要求：${profile.cookingDifficulty}` : '';
+    const restrictionsHint = profile.restrictions?.length ? 
+      `饮食限制/忌口：${profile.restrictions.join('、')}` : '';
+    const customHint = customRequest ? 
+      `用户特殊要求：${customRequest}` : '';
+
     return `请为以下用户制定一周的详细膳食计划，必须以JSON格式返回：
 
 用户资料：
-- 身高：${profile.heightCm}cm，体重：${profile.weightKg}kg，目标：${profile.healthGoal}
+- 身高：${profile.heightCm || '未知'}cm，体重：${profile.weightKg || '未知'}kg，目标：${profile.healthGoal}
 - 每日热量目标：${profile.dailyCalorieGoal} kcal
 - 每日餐次：${profile.mealCount} 餐
 - 口味偏好：${profile.flavorPrefs?.join(', ') || '无特殊要求'}
 - 过敏原：${profile.allergyTags?.join(', ') || '无'}
+${difficultyHint}
+${restrictionsHint}
+${customHint}
 
 要求：
 1. 提供周一至周日（7天）每天的完整食谱
-2. 每餐必须包含：具体菜品名称、食材分量(g)、卡路里(kcal)、烹饪建议
-3. 确保营养均衡，蛋白质/碳水/脂肪比例约为 3:4:3
+2. 每餐必须包含：具体菜品名称、食材分量(g)、卡路里(kcal)、烹饪建议、蛋白质(g)、碳水(g)、脂肪(g)
+3. 确保营养均衡，蛋白质/碳水/脂肪比例根据"${profile.healthGoal}"目标调整：
+   - 减脂：蛋白质 35%、碳水 35%、脂肪 30%
+   - 增肌：蛋白质 40%、碳水 40%、脂肪 20%
+   - 维持：蛋白质 30%、碳水 45%、脂肪 25%
 4. 每天总热量严格控制在 ${profile.dailyCalorieGoal}±100kcal 范围内
-5. 根据"${profile.healthGoal}"目标调整食材选择
+5. 菜品要符合中国人口味，烹饪方式要实用可行
+6. 食材搭配要多样化，避免重复
 
 【重要】请以如下JSON格式返回，不要包含其他文字：
 {
@@ -221,17 +235,31 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
           "mealType": "breakfast",
           "mealName": "早餐",
           "dishes": [
-            {"name": "菜品名称", "quantityG": 100, "calories": 300, "cookingTip": "烹饪建议"}
+            {
+              "name": "菜品名称",
+              "quantityG": 100,
+              "calories": 300,
+              "proteinG": 15,
+              "carbsG": 30,
+              "fatG": 10,
+              "cookingTip": "烹饪建议"
+            }
           ],
-          "mealCalories": 500
-        },
-        {"mealType": "lunch", "mealName": "午餐", ...},
-        {"mealType": "dinner", "mealName": "晚餐", ...}
+          "mealCalories": 500,
+          "mealProtein": 20,
+          "mealCarbs": 50,
+          "mealFat": 15
+        }
       ],
-      "nutrition": {"proteinG": 80, "carbsG": 120, "fatG": 50}
-    },
-    {"dayOfWeek": 2, "dayName": "周二", ...},
-    ...直到dayOfWeek 7（周日）
+      "dailyNutrition": {
+        "proteinG": 120,
+        "carbsG": 150,
+        "fatG": 55,
+        "proteinPercent": 30,
+        "carbsPercent": 45,
+        "fatPercent": 25
+      }
+    }
   ]
 }`;
   }

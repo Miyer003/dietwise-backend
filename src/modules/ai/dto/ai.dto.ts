@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsNumber, IsBoolean, IsArray } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum AnalyzeType {
@@ -68,11 +69,13 @@ export class GenerateMealPlanDto {
   @ApiProperty({ description: '身高(cm)', required: false })
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   heightCm?: number;
 
   @ApiProperty({ description: '体重(kg)', required: false })
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   weightKg?: number;
 
   @ApiProperty({ description: '使用AI生成', default: true, required: false })
