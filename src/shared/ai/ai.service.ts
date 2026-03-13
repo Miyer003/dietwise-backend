@@ -200,30 +200,40 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     const customHint = customRequest ? 
       `用户特殊要求：${customRequest}` : '';
 
-    return `请为以下用户制定一周的详细膳食计划，必须以JSON格式返回：
+    // 根据健康目标计算营养比例
+    let proteinPercent = 30;
+    let carbsPercent = 45;
+    let fatPercent = 25;
+    if (profile.healthGoal === '减脂') {
+      proteinPercent = 35; carbsPercent = 35; fatPercent = 30;
+    } else if (profile.healthGoal === '增肌') {
+      proteinPercent = 40; carbsPercent = 40; fatPercent = 20;
+    }
 
-用户资料：
-- 身高：${profile.heightCm || '未知'}cm，体重：${profile.weightKg || '未知'}kg，目标：${profile.healthGoal}
+    return `你是一位专业的营养师，请为以下用户制定一周的详细膳食计划。
+
+【用户资料】
+- 身高：${profile.heightCm || '未知'}cm，体重：${profile.weightKg || '未知'}kg
+- 饮食目标：${profile.healthGoal}
 - 每日热量目标：${profile.dailyCalorieGoal} kcal
-- 每日餐次：${profile.mealCount} 餐
+- 每日餐数：${profile.mealCount} 餐
 - 口味偏好：${profile.flavorPrefs?.join(', ') || '无特殊要求'}
 - 过敏原：${profile.allergyTags?.join(', ') || '无'}
 ${difficultyHint}
 ${restrictionsHint}
 ${customHint}
 
-要求：
-1. 提供周一至周日（7天）每天的完整食谱
-2. 每餐必须包含：具体菜品名称、食材分量(g)、卡路里(kcal)、烹饪建议、蛋白质(g)、碳水(g)、脂肪(g)
-3. 确保营养均衡，蛋白质/碳水/脂肪比例根据"${profile.healthGoal}"目标调整：
-   - 减脂：蛋白质 35%、碳水 35%、脂肪 30%
-   - 增肌：蛋白质 40%、碳水 40%、脂肪 20%
-   - 维持：蛋白质 30%、碳水 45%、脂肪 25%
-4. 每天总热量严格控制在 ${profile.dailyCalorieGoal}±100kcal 范围内
-5. 菜品要符合中国人口味，烹饪方式要实用可行
-6. 食材搭配要多样化，避免重复
+【营养比例要求】
+${profile.healthGoal}目标的营养配比：蛋白质${proteinPercent}% / 碳水${carbsPercent}% / 脂肪${fatPercent}%
 
-【重要】请以如下JSON格式返回，不要包含其他文字：
+【输出要求】
+1. 必须严格按照以下JSON格式返回，不要添加任何markdown标记或其他文字
+2. 必须提供完整的7天食谱（dayOfWeek: 1-7）
+3. 每天必须包含${profile.mealCount}餐（早餐breakfast、午餐lunch、晚餐dinner${profile.mealCount > 3 ? '、加餐snack' : ''}）
+4. 每道菜必须包含：name（菜品名称）、quantityG（克数）、calories（卡路里）、proteinG（蛋白质）、carbsG（碳水）、fatG（脂肪）、cookingTip（烹饪建议）
+5. 每天总热量必须接近${profile.dailyCalorieGoal}kcal（±100kcal）
+
+【JSON格式示例】
 {
   "days": [
     {
@@ -236,32 +246,34 @@ ${customHint}
           "mealName": "早餐",
           "dishes": [
             {
-              "name": "菜品名称",
-              "quantityG": 100,
-              "calories": 300,
-              "proteinG": 15,
-              "carbsG": 30,
-              "fatG": 10,
-              "cookingTip": "烹饪建议"
+              "name": "燕麦粥",
+              "quantityG": 50,
+              "calories": 150,
+              "proteinG": 5,
+              "carbsG": 27,
+              "fatG": 3,
+              "cookingTip": "加水煮至软烂"
             }
           ],
-          "mealCalories": 500,
-          "mealProtein": 20,
-          "mealCarbs": 50,
-          "mealFat": 15
+          "mealCalories": 150,
+          "mealProtein": 5,
+          "mealCarbs": 27,
+          "mealFat": 3
         }
       ],
       "dailyNutrition": {
-        "proteinG": 120,
-        "carbsG": 150,
-        "fatG": 55,
-        "proteinPercent": 30,
-        "carbsPercent": 45,
-        "fatPercent": 25
+        "proteinG": ${Math.round(profile.dailyCalorieGoal * proteinPercent / 100 / 4)},
+        "carbsG": ${Math.round(profile.dailyCalorieGoal * carbsPercent / 100 / 4)},
+        "fatG": ${Math.round(profile.dailyCalorieGoal * fatPercent / 100 / 9)},
+        "proteinPercent": ${proteinPercent},
+        "carbsPercent": ${carbsPercent},
+        "fatPercent": ${fatPercent}
       }
     }
   ]
-}`;
+}
+
+【重要】只返回纯JSON，不要markdown代码块，不要解释文字！`;
   }
 
   // 默认食谱模板（当 AI 服务都失败时使用）

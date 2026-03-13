@@ -152,8 +152,9 @@ export class MealPlanService {
     const customRequest = (dto as any).customRequest;
     const aiResult = await this.aiService.generateMealPlan(userProfile, customRequest);
 
-    // 解析AI返回的食谱数据（简化实现）
+    // 解析AI返回的食谱数据
     const parsedPlan = this.parseAIResponse(aiResult);
+    console.log(`解析完成，共 ${parsedPlan.days.length} 条记录`);
 
     // 创建食谱记录
     const plan = this.planRepo.create({
@@ -283,19 +284,35 @@ export class MealPlanService {
   } {
     const days: ReturnType<typeof this.parseAIResponse>['days'] = [];
 
+    // 打印AI原始响应用于调试
+    console.log('=== AI原始响应 ===');
+    console.log(aiText.substring(0, 2000));
+    console.log('==================');
+
     try {
       // 清理AI响应，去除markdown代码块标记
       let cleanText = aiText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
       
-      // 尝试从AI响应中提取JSON
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
+      // 尝试找到JSON开始的位置（第一个{）
+      const jsonStartIndex = cleanText.indexOf('{');
+      const jsonEndIndex = cleanText.lastIndexOf('}');
+      
+      if (jsonStartIndex === -1 || jsonEndIndex === -1 || jsonStartIndex >= jsonEndIndex) {
+        console.log('未找到有效的JSON格式');
+      } else {
+        const jsonString = cleanText.substring(jsonStartIndex, jsonEndIndex + 1);
+        
         try {
-          const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = JSON.parse(jsonString);
+          console.log('JSON解析成功，结构:', Object.keys(parsed));
           
           // 处理新的结构化格式 { days: [{ dayOfWeek, meals: [...], dailyNutrition }] }
           if (parsed.days && Array.isArray(parsed.days)) {
+            console.log(`找到 ${parsed.days.length} 天的数据`);
+            
             for (const day of parsed.days) {
+              console.log(`处理第${day.dayOfWeek}天，meals:`, day.meals?.length || 0);
+              
               if (day.meals && Array.isArray(day.meals)) {
                 for (const meal of day.meals) {
                   const dishes = (meal.dishes || []).map((d: any) => ({
@@ -317,11 +334,15 @@ export class MealPlanService {
                     nutritionNotes = `本餐 蛋白质:${meal.mealProtein || 0}g 碳水:${meal.mealCarbs || 0}g 脂肪:${meal.mealFat || 0}g`;
                   }
                   
+                  const totalCalories = parseInt(meal.mealCalories) || dishes.reduce((sum: number, d: any) => sum + (d.calories || 0), 0);
+                  
+                  console.log(`  ${meal.mealType}: ${dishes.length}道菜, ${totalCalories}kcal`);
+                  
                   days.push({
                     dayOfWeek: day.dayOfWeek || 1,
                     mealType: meal.mealType || 'breakfast',
                     dishes,
-                    totalCalories: parseInt(meal.mealCalories) || dishes.reduce((sum: number, d: any) => sum + (d.calories || 0), 0),
+                    totalCalories,
                     notes: nutritionNotes,
                   });
                 }
@@ -329,16 +350,20 @@ export class MealPlanService {
             }
             
             if (days.length > 0) {
+              console.log(`解析成功，共${days.length}条记录`);
               return { days };
             }
+          } else {
+            console.log('未找到days数组或格式不正确');
           }
           
           // 兼容旧格式 { days: [{ dayOfWeek, mealType, dishes }] }
           if (parsed.days && Array.isArray(parsed.days) && parsed.days[0]?.mealType) {
+            console.log('使用旧格式解析');
             return { days: parsed.days };
           }
-        } catch (jsonError) {
-          console.log('JSON解析失败，回退到正则解析:', jsonError.message);
+        } catch (jsonError: any) {
+          console.log('JSON解析失败:', jsonError.message);
         }
       }
 
