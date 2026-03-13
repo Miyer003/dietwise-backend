@@ -117,6 +117,14 @@ export class MealPlanService {
       await this.dayRepo.save(dayEntities);
     }
 
+    // 同步更新用户 profile 的每日热量目标和饮食设置
+    await this.userService.updateProfile(userId, {
+      dailyCalorieGoal: dto.calorieTarget,
+      mealCount: dto.mealCount,
+      healthGoal: dto.healthGoal,
+      flavorPrefs: dto.flavorPrefs,
+    });
+
     return this.getById(userId, saved.id);
   }
 
@@ -172,6 +180,14 @@ export class MealPlanService {
       );
       await this.dayRepo.save(dayEntities);
     }
+
+    // 同步更新用户 profile 的每日热量目标和饮食设置
+    await this.userService.updateProfile(userId, {
+      dailyCalorieGoal: userProfile.dailyCalorieGoal,
+      mealCount: userProfile.mealCount,
+      healthGoal: userProfile.healthGoal,
+      flavorPrefs: userProfile.flavorPrefs,
+    });
 
     return this.getById(userId, saved.id);
   }
@@ -240,7 +256,7 @@ export class MealPlanService {
 
     return {
       id: plan.id,
-      type: plan.type,
+      planType: plan.type,  // 统一字段名为 planType
       calorieTarget: plan.calorieTarget,
       mealCount: plan.mealCount,
       healthGoal: plan.healthGoal,
@@ -264,27 +280,56 @@ export class MealPlanService {
     const days: ReturnType<typeof this.parseAIResponse>['days'] = [];
 
     try {
+      // 清理AI响应，去除markdown代码块标记
+      let cleanText = aiText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+      
       // 尝试从AI响应中提取JSON
-      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.days && Array.isArray(parsed.days)) {
-          return { days: parsed.days };
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          
+          // 处理新的结构化格式 { days: [{ dayOfWeek, meals: [...] }] }
+          if (parsed.days && Array.isArray(parsed.days)) {
+            for (const day of parsed.days) {
+              if (day.meals && Array.isArray(day.meals)) {
+                for (const meal of day.meals) {
+                  const dishes = (meal.dishes || []).map((d: any) => ({
+                    name: d.name || '未知菜品',
+                    quantityG: parseInt(d.quantityG) || 100,
+                    calories: parseInt(d.calories) || 0,
+                    cookingTip: d.cookingTip || '',
+                  }));
+                  
+                  days.push({
+                    dayOfWeek: day.dayOfWeek || 1,
+                    mealType: meal.mealType || 'breakfast',
+                    dishes,
+                    totalCalories: parseInt(meal.mealCalories) || dishes.reduce((sum: number, d: any) => sum + (d.calories || 0), 0),
+                    notes: day.nutrition ? `蛋白质:${day.nutrition.proteinG}g 碳水:${day.nutrition.carbsG}g 脂肪:${day.nutrition.fatG}g` : '',
+                  });
+                }
+              }
+            }
+            
+            if (days.length > 0) {
+              return { days };
+            }
+          }
+          
+          // 兼容旧格式 { days: [{ dayOfWeek, mealType, dishes }] }
+          if (parsed.days && Array.isArray(parsed.days) && parsed.days[0]?.mealType) {
+            return { days: parsed.days };
+          }
+        } catch (jsonError) {
+          console.log('JSON解析失败，回退到正则解析:', jsonError.message);
         }
       }
 
       // 如果JSON解析失败，使用正则表达式提取
       // 匹配每一天的食谱（周一至周日）
-      const dayPattern = /周[一二三四五六日]|星期[一二三四五六日]|Day\s*\d+/gi;
-      const mealPattern = /(早餐|午餐|晚餐|加餐)\s*[：:]\s*([^\n]+(?:\n(?![早餐|午餐|晚餐|加餐]).*)*)/gi;
-      const dishPattern = /[-•*]\s*([^\n（]+)(?:（(\d+)\s*克）)?\s*(?:约?\s*(\d+)\s*[千卡kcal])?/gi;
-
+      const lines = cleanText.split('\n');
       let currentDay = 1;
-      const meals = ['breakfast', 'lunch', 'dinner', 'snack'];
-      let mealIndex = 0;
-
-      // 简单的文本解析逻辑
-      const lines = aiText.split('\n');
       let currentMeal = '';
       let currentDishes: typeof days[0]['dishes'] = [];
 
@@ -304,7 +349,6 @@ export class MealPlanService {
             });
           }
           currentDay = Math.min(currentDay + 1, 7);
-          mealIndex = 0;
           currentMeal = '';
           currentDishes = [];
           continue;
@@ -392,6 +436,7 @@ export class MealPlanService {
 
     // 如果没有解析到任何数据，返回默认结构
     if (days.length === 0) {
+      console.log('未解析到任何食谱数据，使用默认模板');
       // 生成默认的一周食谱结构
       for (let day = 1; day <= 7; day++) {
         for (const meal of ['breakfast', 'lunch', 'dinner']) {

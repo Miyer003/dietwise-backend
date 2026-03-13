@@ -81,6 +81,7 @@ export class DietService {
       }
 
       items = [{
+        userId,  // 添加 userId
         foodName: analysis.foodName,
         quantityG: analysis.quantityG * (dto.portionFactor || 1),
         portionFactor: dto.portionFactor || 1,
@@ -98,6 +99,7 @@ export class DietService {
     } else {
       // 手动录入或语音录入
       items = (dto.items || []).map(item => ({
+        userId,  // 添加 userId
         foodName: item.foodName,
         foodItemId: item.foodItemId,
         quantityG: item.quantityG,
@@ -177,7 +179,8 @@ export class DietService {
     const saved = await this.recordRepo.save(record);
 
     // 清除缓存
-    const date = saved.recordDate.toISOString().split('T')[0];
+    const savedRecordDate = saved.recordDate instanceof Date ? saved.recordDate : new Date(saved.recordDate);
+    const date = savedRecordDate.toISOString().split('T')[0];
     await this.redisService.del(`diet:daily:${userId}:${date}`);
 
     return saved;
@@ -186,8 +189,16 @@ export class DietService {
   // 删除记录
   async deleteRecord(userId: string, id: string) {
     const record = await this.getRecordById(userId, id);
-    const date = record.recordDate.toISOString().split('T')[0];
+    // recordDate 可能是 Date 或 string，统一处理
+    const recordDate = record.recordDate instanceof Date 
+      ? record.recordDate 
+      : new Date(record.recordDate);
+    const date = recordDate.toISOString().split('T')[0];
     
+    // 先删除子表记录（外键约束）
+    await this.itemRepo.delete({ recordId: id });
+    
+    // 再软删除主表记录
     await this.recordRepo.softDelete(id);
     
     // 清除缓存
@@ -197,17 +208,24 @@ export class DietService {
   // 获取每日摘要（带缓存）
   async getDailySummary(userId: string, date: string) {
     const cacheKey = `diet:daily:${userId}:${date}`;
+    
+    // 删除缓存强制刷新数据（避免软删除数据仍出现在缓存中）
+    await this.redisService.del(cacheKey);
+    
     const cached = await this.redisService.get(cacheKey);
     
     if (cached) {
       return JSON.parse(cached);
     }
 
-    const records = await this.recordRepo.find({
-      where: { userId, recordDate: date as any },
-      relations: ['items'],
-      order: { createdAt: 'ASC' },
-    });
+    // 使用 QueryBuilder 确保只查询未软删除的记录
+    const records = await this.recordRepo.createQueryBuilder('record')
+      .leftJoinAndSelect('record.items', 'items')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.recordDate = :date', { date })
+      .andWhere('record.deletedAt IS NULL')
+      .orderBy('record.createdAt', 'ASC')
+      .getMany();
 
     // 获取用户每日目标
     const profile = await this.userService.getProfile(userId).catch(() => null);
@@ -228,13 +246,32 @@ export class DietService {
       healthScore: this.calculateHealthScore(records, goal),
       mealRecords: records.map(r => ({
         id: r.id,
+        recordDate: date,
         mealType: r.mealType,
+        mealSeq: r.mealSeq,
         totalCalories: r.totalCalories,
+        totalProtein: r.totalProtein,
+        totalCarbs: r.totalCarbs,
+        totalFat: r.totalFat,
+        inputMethod: r.inputMethod,
+        notes: r.notes,
         items: r.items.map(i => ({
+          id: i.id,
           foodName: i.foodName,
+          foodItemId: i.foodItemId,
           quantityG: i.quantityG,
+          portionFactor: i.portionFactor,
           calories: i.calories,
+          proteinG: i.proteinG,
+          carbsG: i.carbsG,
+          fatG: i.fatG,
+          fiberG: i.fiberG,
+          sodiumMg: i.sodiumMg,
+          imageUrl: i.imageUrl,
+          imageHash: i.imageHash,
+          aiConfidence: i.aiConfidence,
         })),
+        createdAt: r.createdAt.toISOString(),
       })),
     };
 
@@ -263,7 +300,9 @@ export class DietService {
     // 按天分组
     const dailyMap = new Map();
     for (const record of records) {
-      const date = record.recordDate.toISOString().split('T')[0];
+      // 处理 recordDate 可能是字符串的情况
+      const recordDate = record.recordDate instanceof Date ? record.recordDate : new Date(record.recordDate);
+      const date = recordDate.toISOString().split('T')[0];
       if (!dailyMap.has(date)) {
         dailyMap.set(date, { calories: 0, count: 0 });
       }
@@ -318,7 +357,11 @@ export class DietService {
     });
 
     const totalCalories = records.reduce((sum, r) => sum + Number(r.totalCalories), 0);
-    const daysWithRecords = new Set(records.map(r => r.recordDate.toISOString().split('T')[0])).size;
+    // 处理 recordDate 可能是字符串的情况
+    const daysWithRecords = new Set(records.map(r => {
+      const date = r.recordDate instanceof Date ? r.recordDate : new Date(r.recordDate);
+      return date.toISOString().split('T')[0];
+    })).size;
 
     const avgDailyCalories = daysWithRecords > 0 ? totalCalories / daysWithRecords : 0;
     const compliantDays = daysWithRecords; // 简化计算
@@ -387,5 +430,107 @@ export class DietService {
       hash = hash & hash;
     }
     return Math.abs(hash).toString(16);
+  }
+
+  // 获取有记录的所有日期列表
+  async getDatesWithRecords(userId: string, limit: number = 365) {
+    // 使用 QueryBuilder 获取所有记录，然后手动提取和去重日期
+    const records = await this.recordRepo.createQueryBuilder('record')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .orderBy('record.recordDate', 'DESC')
+      .getMany();
+
+    // 使用 Set 去重日期
+    const dateSet = new Set<string>();
+    
+    for (const record of records) {
+      // 处理 recordDate 可能是 Date 或 string 的情况
+      const recordDate: any = record.recordDate;
+      let dateStr: string;
+      
+      if (recordDate instanceof Date) {
+        dateStr = recordDate.toISOString().split('T')[0];
+      } else if (typeof recordDate === 'string') {
+        dateStr = recordDate.split('T')[0];
+      } else {
+        dateStr = new Date(recordDate).toISOString().split('T')[0];
+      }
+      
+      dateSet.add(dateStr);
+    }
+
+    // 转换为数组并限制数量
+    const uniqueDates = Array.from(dateSet).slice(0, limit);
+    
+    console.log('[getDatesWithRecords] 找到的唯一日期:', uniqueDates);
+
+    return uniqueDates.map(date => ({
+      date,
+      hasRecord: true,
+    }));
+  }
+
+  // 获取有记录的所有周列表
+  async getWeeksWithRecords(userId: string, limit: number = 52) {
+    const records = await this.recordRepo.createQueryBuilder('record')
+      .select('DISTINCT record.recordDate', 'date')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .orderBy('record.recordDate', 'DESC')
+      .getRawMany();
+
+    // 按周分组
+    const weekMap = new Map<string, { weekStart: string; weekEnd: string; hasRecord: boolean; recordCount: number }>();
+    
+    for (const r of records) {
+      const date = new Date(r.date);
+      // 计算本周开始（周一）
+      const dayOfWeek = date.getDay() || 7; // 周日为0，转为7
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - dayOfWeek + 1);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      const weekKey = weekStart.toISOString().split('T')[0];
+      
+      if (!weekMap.has(weekKey)) {
+        weekMap.set(weekKey, {
+          weekStart: weekKey,
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          hasRecord: true,
+          recordCount: 1,
+        });
+      } else {
+        const week = weekMap.get(weekKey)!;
+        week.recordCount++;
+      }
+    }
+
+    return Array.from(weekMap.values())
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+      .slice(0, limit);
+  }
+
+  // 获取有记录的所有月列表
+  async getMonthsWithRecords(userId: string, limit: number = 24) {
+    const records = await this.recordRepo.createQueryBuilder('record')
+      .select('DISTINCT DATE_TRUNC(\'month\', record.recordDate)', 'month')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .orderBy('month', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return records.map(r => {
+      const monthDate = new Date(r.month);
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth() + 1;
+      return {
+        month: `${year}-${month.toString().padStart(2, '0')}`,
+        label: `${year}年${month}月`,
+        hasRecord: true,
+      };
+    });
   }
 }

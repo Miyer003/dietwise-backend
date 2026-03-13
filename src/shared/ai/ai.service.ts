@@ -12,12 +12,33 @@ export class AIService {
     private readonly moonshot: MoonshotService,
   ) {}
 
-  // 营养分析：优先使用 Dashscope VL 模型（图片）
+  // 营养分析：优先使用 Dashscope VL 模型（图片 URL）
   async analyzeNutrition(imageUrl: string): Promise<NutritionAnalysisResult> {
     try {
       return await this.dashscope.analyzeNutritionByImage(imageUrl);
     } catch (error) {
       this.logger.error('AI 图片分析失败，返回默认值:', error.message);
+      // 返回默认值，避免前端报错
+      return {
+        foodName: '未知食物',
+        quantityG: 100,
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sodiumMg: 0,
+        confidence: 0.5,
+      };
+    }
+  }
+
+  // 营养分析：使用 Base64 图片
+  async analyzeNutritionByBase64(base64Image: string): Promise<NutritionAnalysisResult> {
+    try {
+      return await this.dashscope.analyzeNutritionByBase64(base64Image);
+    } catch (error) {
+      this.logger.error('AI 图片分析失败(Base64)，返回默认值:', error.message);
       // 返回默认值，避免前端报错
       return {
         foodName: '未知食物',
@@ -91,32 +112,39 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     }
   }
 
-  // 生成食谱：使用 Moonshot 长文本模型，失败时使用 Dashscope
+  // 生成食谱：优先使用 Dashscope (Qwen)，失败时使用 Moonshot (Kimi)
   async generateMealPlan(userProfile: any): Promise<string> {
     const prompt = this.buildMealPlanPrompt(userProfile);
     
-    // 先尝试 Moonshot
+    // 先尝试 Dashscope (Qwen)
     try {
-      this.logger.log('尝试使用 Moonshot 生成食谱...');
-      const result = await this.moonshot.generateMealPlan(prompt);
+      this.logger.log('尝试使用 Dashscope (Qwen) 生成食谱...');
+      const result = await this.dashscope.chatCompletion([
+        { 
+          role: 'system', 
+          content: '你是一位专业的营养师，擅长根据用户的身体数据和饮食偏好制定详细的膳食计划。请用中文回答，提供具体的一周食谱，包括每餐的菜品、食材分量、烹饪建议和营养分析。' 
+        },
+        { role: 'user', content: prompt }
+      ]);
       if (result && result.length > 50) {
+        this.logger.log('Dashscope (Qwen) 生成食谱成功');
         return result;
       }
-      throw new Error('Moonshot 返回内容太短');
-    } catch (moonshotError) {
-      this.logger.warn(`Moonshot 失败: ${moonshotError.message}，尝试 Dashscope...`);
+      throw new Error('Dashscope 返回内容太短');
+    } catch (dashscopeError) {
+      this.logger.warn(`Dashscope (Qwen) 失败: ${dashscopeError.message}，尝试 Moonshot (Kimi)...`);
       
-      // 降级到 Dashscope
+      // 降级到 Moonshot (Kimi)
       try {
-        const result = await this.dashscope.chatCompletion([
-          { role: 'user', content: prompt }
-        ]);
+        this.logger.log('尝试使用 Moonshot (Kimi) 生成食谱...');
+        const result = await this.moonshot.generateMealPlan(prompt);
         if (result && result.length > 50) {
+          this.logger.log('Moonshot (Kimi) 生成食谱成功');
           return result;
         }
-        throw new Error('Dashscope 返回内容太短');
-      } catch (dashscopeError) {
-        this.logger.error(`Dashscope 也失败: ${dashscopeError.message}`);
+        throw new Error('Moonshot 返回内容太短');
+      } catch (moonshotError) {
+        this.logger.error(`Moonshot (Kimi) 也失败: ${moonshotError.message}`);
         // 返回默认食谱模板
         return this.getDefaultMealPlan(userProfile);
       }
@@ -165,7 +193,7 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
   }
 
   private buildMealPlanPrompt(profile: any): string {
-    return `请为以下用户制定一周的详细膳食计划：
+    return `请为以下用户制定一周的详细膳食计划，必须以JSON格式返回：
 
 用户资料：
 - 身高：${profile.heightCm}cm，体重：${profile.weightKg}kg，目标：${profile.healthGoal}
@@ -175,13 +203,37 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
 - 过敏原：${profile.allergyTags?.join(', ') || '无'}
 
 要求：
-1. 提供周一至周日每天的具体食谱
-2. 每餐列出具体菜品、建议食材分量(g)、烹饪方法
-3. 确保营养均衡，蛋白质/碳水/脂肪比例合理
-4. 总热量控制在目标范围内（±100kcal）
-5. 给出简要的每日营养分析
+1. 提供周一至周日（7天）每天的完整食谱
+2. 每餐必须包含：具体菜品名称、食材分量(g)、卡路里(kcal)、烹饪建议
+3. 确保营养均衡，蛋白质/碳水/脂肪比例约为 3:4:3
+4. 每天总热量严格控制在 ${profile.dailyCalorieGoal}±100kcal 范围内
+5. 根据"${profile.healthGoal}"目标调整食材选择
 
-请用中文回答，格式清晰易读。`;
+【重要】请以如下JSON格式返回，不要包含其他文字：
+{
+  "days": [
+    {
+      "dayOfWeek": 1,
+      "dayName": "周一",
+      "totalCalories": ${profile.dailyCalorieGoal},
+      "meals": [
+        {
+          "mealType": "breakfast",
+          "mealName": "早餐",
+          "dishes": [
+            {"name": "菜品名称", "quantityG": 100, "calories": 300, "cookingTip": "烹饪建议"}
+          ],
+          "mealCalories": 500
+        },
+        {"mealType": "lunch", "mealName": "午餐", ...},
+        {"mealType": "dinner", "mealName": "晚餐", ...}
+      ],
+      "nutrition": {"proteinG": 80, "carbsG": 120, "fatG": 50}
+    },
+    {"dayOfWeek": 2, "dayName": "周二", ...},
+    ...直到dayOfWeek 7（周日）
+  ]
+}`;
   }
 
   // 默认食谱模板（当 AI 服务都失败时使用）
@@ -189,23 +241,91 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     const calorieTarget = profile.dailyCalorieGoal || 2000;
     const mealCount = profile.mealCount || 3;
     const goal = profile.healthGoal || '维持';
+    const breakfastCal = Math.round(calorieTarget * 0.25);
+    const lunchCal = Math.round(calorieTarget * 0.4);
+    const dinnerCal = Math.round(calorieTarget * 0.35);
     
-    return `## 一周膳食计划（${goal}目标）
-
-### 周一
-**早餐** (约 ${Math.round(calorieTarget * 0.25)} kcal)
-- 燕麦粥 50g + 牛奶 200ml + 水煮蛋 1个
-
-**午餐** (约 ${Math.round(calorieTarget * 0.4)} kcal)
-- 米饭 150g + 清蒸鱼 100g + 炒时蔬 200g
-
-**晚餐** (约 ${Math.round(calorieTarget * 0.35)} kcal)
-- 杂粮粥 100g + 凉拌豆腐 150g + 炒青菜 200g
-
-### 周二至周日
-（按周一模式轮换，可根据个人喜好调整）
-
----
-*注：此为默认模板，AI 服务暂时不可用。建议稍后重新生成个性化食谱。*`;
+    return `{
+  "days": [
+    {
+      "dayOfWeek": 1,
+      "dayName": "周一",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "燕麦粥", "quantityG": 50, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "用低脂牛奶煮制"}, {"name": "水煮蛋", "quantityG": 50, "calories": ${Math.round(breakfastCal * 0.3)}, "cookingTip": "冷水下锅煮8分钟"}, {"name": "脱脂牛奶", "quantityG": 200, "calories": ${Math.round(breakfastCal * 0.3)}, "cookingTip": "温热饮用更佳"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "糙米饭", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "提前浸泡30分钟"}, {"name": "清蒸鲈鱼", "quantityG": 120, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "蒸8-10分钟，加姜丝葱段"}, {"name": "蒜蓉西兰花", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.2)}, "cookingTip": "快炒保持脆嫩"}, {"name": "番茄蛋汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.1)}, "cookingTip": "少油清淡"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "杂粮粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "多种杂粮混合"}, {"name": "凉拌豆腐", "quantityG": 150, "calories": ${Math.round(dinnerCal * 0.3)}, "cookingTip": "加少量香油和酱油"}, {"name": "清炒时蔬", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.3)}, "cookingTip": "少油快炒"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 2,
+      "dayName": "周二",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "全麦面包", "quantityG": 80, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "可配少量果酱"}, {"name": "煎蛋", "quantityG": 50, "calories": ${Math.round(breakfastCal * 0.35)}, "cookingTip": "少油煎制"}, {"name": "豆浆", "quantityG": 250, "calories": ${Math.round(breakfastCal * 0.25)}, "cookingTip": "无糖豆浆更健康"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "藜麦饭", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "藜麦提前浸泡"}, {"name": "宫保鸡丁", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "少油少盐版本"}, {"name": "凉拌黄瓜", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "清爽开胃"}, {"name": "紫菜蛋花汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "关火后淋入蛋液"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "小米粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "小火慢熬"}, {"name": "蒸蛋羹", "quantityG": 150, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "加温水搅拌均匀"}, {"name": "白灼菜心", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "水开焯烫1分钟"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 3,
+      "dayName": "周三",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "玉米", "quantityG": 150, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "蒸煮均可"}, {"name": "鸡蛋羹", "quantityG": 100, "calories": ${Math.round(breakfastCal * 0.35)}, "cookingTip": "嫩滑口感"}, {"name": "牛奶", "quantityG": 200, "calories": ${Math.round(breakfastCal * 0.25)}, "cookingTip": "温热饮用"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "荞麦面", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "过冷水更劲道"}, {"name": "酱牛肉", "quantityG": 100, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "切片薄厚适中"}, {"name": "拌菠菜", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.2)}, "cookingTip": "焯水后过凉"}, {"name": "冬瓜汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.1)}, "cookingTip": "清淡利尿"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "南瓜粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "南瓜软糯香甜"}, {"name": "清蒸虾", "quantityG": 120, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "蒸3-5分钟即可"}, {"name": "凉拌木耳", "quantityG": 150, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "提前泡发"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 4,
+      "dayName": "周四",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "紫薯", "quantityG": 150, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "蒸熟后剥皮"}, {"name": "茶叶蛋", "quantityG": 60, "calories": ${Math.round(breakfastCal * 0.35)}, "cookingTip": "自制少盐版本"}, {"name": "酸奶", "quantityG": 150, "calories": ${Math.round(breakfastCal * 0.25)}, "cookingTip": "无糖原味"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "黑米饭", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "黑米需多煮一会"}, {"name": "红烧鸡腿", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "去皮减少脂肪"}, {"name": "清炒豆芽", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "大火快炒"}, {"name": "白菜豆腐汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "清淡暖胃"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "燕麦粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "可加少许枸杞"}, {"name": "蒸蛋", "quantityG": 100, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "嫩滑细腻"}, {"name": "蒜蓉生菜", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "快速翻炒"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 5,
+      "dayName": "周五",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "山药", "quantityG": 150, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "蒸煮均可健脾"}, {"name": "水煮蛋", "quantityG": 50, "calories": ${Math.round(breakfastCal * 0.35)}, "cookingTip": "全熟蛋"}, {"name": "豆浆", "quantityG": 250, "calories": ${Math.round(breakfastCal * 0.25)}, "cookingTip": "温热饮用"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "红薯饭", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "红薯切块同煮"}, {"name": "清蒸带鱼", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "腌制去腥"}, {"name": "凉拌芹菜", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "爽脆口感"}, {"name": "丝瓜蛋汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "清淡解暑"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "红豆薏米粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "祛湿健脾"}, {"name": "白灼虾", "quantityG": 100, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "蘸料清淡"}, {"name": "凉拌黄瓜", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "爽脆开胃"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 6,
+      "dayName": "周六",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "全麦三明治", "quantityG": 120, "calories": ${Math.round(breakfastCal * 0.5)}, "cookingTip": "夹鸡蛋和蔬菜"}, {"name": "牛奶", "quantityG": 250, "calories": ${Math.round(breakfastCal * 0.3)}, "cookingTip": "搭配早餐"}, {"name": "小番茄", "quantityG": 100, "calories": ${Math.round(breakfastCal * 0.2)}, "cookingTip": "清新解腻"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "意大利面", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.4)}, "cookingTip": "番茄酱少油"}, {"name": "煎鸡胸", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "少油煎至金黄"}, {"name": "蔬菜沙拉", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "油醋汁调味"}, {"name": "蘑菇汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.1)}, "cookingTip": "鲜美浓郁"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "紫薯粥", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "香甜软糯"}, {"name": "蒸蛋", "quantityG": 100, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "嫩滑口感"}, {"name": "白灼芥兰", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "保持翠绿"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    },
+    {
+      "dayOfWeek": 7,
+      "dayName": "周日",
+      "totalCalories": ${calorieTarget},
+      "meals": [
+        {"mealType": "breakfast", "mealName": "早餐", "dishes": [{"name": "水果燕麦", "quantityG": 80, "calories": ${Math.round(breakfastCal * 0.4)}, "cookingTip": "加酸奶或牛奶"}, {"name": "水煮蛋", "quantityG": 50, "calories": ${Math.round(breakfastCal * 0.3)}, "cookingTip": "搭配早餐"}, {"name": "香蕉", "quantityG": 100, "calories": ${Math.round(breakfastCal * 0.3)}, "cookingTip": "补充能量"}], "mealCalories": ${breakfastCal}},
+        {"mealType": "lunch", "mealName": "午餐", "dishes": [{"name": "杂粮饭", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "多种谷物搭配"}, {"name": "红烧鱼块", "quantityG": 150, "calories": ${Math.round(lunchCal * 0.35)}, "cookingTip": "少油少盐"}, {"name": "炒时蔬", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "应季蔬菜"}, {"name": "番茄蛋汤", "quantityG": 200, "calories": ${Math.round(lunchCal * 0.15)}, "cookingTip": "经典搭配"}], "mealCalories": ${lunchCal}},
+        {"mealType": "dinner", "mealName": "晚餐", "dishes": [{"name": "绿豆汤", "quantityG": 250, "calories": ${Math.round(dinnerCal * 0.4)}, "cookingTip": "消暑解渴"}, {"name": "蒸蛋羹", "quantityG": 150, "calories": ${Math.round(dinnerCal * 0.35)}, "cookingTip": "嫩滑细腻"}, {"name": "凉拌菠菜", "quantityG": 200, "calories": ${Math.round(dinnerCal * 0.25)}, "cookingTip": "补铁佳品"}], "mealCalories": ${dinnerCal}}
+      ],
+      "nutrition": {"proteinG": ${Math.round(calorieTarget * 0.3 / 4)}, "carbsG": ${Math.round(calorieTarget * 0.5 / 4)}, "fatG": ${Math.round(calorieTarget * 0.2 / 9)}}
+    }
+  ],
+  "note": "此为默认食谱模板，AI服务暂时不可用。建议稍后重新生成个性化食谱。"
+}`;
   }
 }

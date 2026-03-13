@@ -118,11 +118,45 @@ export class DietController {
     return this.dietService.getMonthlySummary(userId, month);
   }
 
+  @Get('history/dates')
+  @ApiOperation({ summary: '获取有记录的所有日期列表' })
+  @ApiQuery({ name: 'limit', required: false, example: 365 })
+  async getDatesWithRecords(
+    @CurrentUser('userId') userId: string,
+    @Query('limit') limit?: number,
+  ) {
+    const dates = await this.dietService.getDatesWithRecords(userId, limit || 365);
+    return { dates };
+  }
+
+  @Get('history/weeks')
+  @ApiOperation({ summary: '获取有记录的所有周列表' })
+  @ApiQuery({ name: 'limit', required: false, example: 52 })
+  async getWeeksWithRecords(
+    @CurrentUser('userId') userId: string,
+    @Query('limit') limit?: number,
+  ) {
+    const weeks = await this.dietService.getWeeksWithRecords(userId, limit || 52);
+    return { weeks };
+  }
+
+  @Get('history/months')
+  @ApiOperation({ summary: '获取有记录的所有月列表' })
+  @ApiQuery({ name: 'limit', required: false, example: 24 })
+  async getMonthsWithRecords(
+    @CurrentUser('userId') userId: string,
+    @Query('limit') limit?: number,
+  ) {
+    const months = await this.dietService.getMonthsWithRecords(userId, limit || 24);
+    return { months };
+  }
+
   @Post('upload-image')
   @ApiOperation({ summary: '获取图片上传URL（预签名）' })
   async getUploadUrl(
     @CurrentUser('userId') userId: string,
     @Query('filename') filename: string,
+    @Body() _body?: any,  // 接受可选的请求体，兼容前端发送的 null 或 {}
   ) {
     const objectName = `diet/${userId}/${Date.now()}_${filename}`;
     const url = await this.minioService.getPresignedPutUrl(objectName, 600);

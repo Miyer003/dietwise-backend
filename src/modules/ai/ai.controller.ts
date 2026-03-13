@@ -29,12 +29,34 @@ export class AIController {
   @Post('analyze-nutrition')
   @ApiOperation({ summary: 'AI营养分析（图片/文字）' })
   async analyzeNutrition(@Body() dto: AnalyzeNutritionDto) {
-    if (dto.type === 'image' && dto.imageUrl) {
-      const result = await this.aiService.analyzeNutrition(dto.imageUrl);
-      return {
-        ...result,
-        isCached: false,
-      };
+    console.log('analyze-nutrition 接收数据:', { 
+      type: dto.type, 
+      hasBase64: !!dto.imageBase64,
+      base64Length: dto.imageBase64?.length,
+      hasUrl: !!dto.imageUrl 
+    });
+    
+    // 图片分析（支持 URL 或 Base64）
+    if (dto.type === 'image') {
+      if (dto.imageBase64) {
+        console.log('使用 Base64 分析，长度:', dto.imageBase64.length);
+        // 使用 Base64 图片
+        const result = await this.aiService.analyzeNutritionByBase64(dto.imageBase64);
+        return {
+          ...result,
+          isCached: false,
+        };
+      } else if (dto.imageUrl) {
+        console.log('使用 URL 分析:', dto.imageUrl);
+        // 使用 URL 图片
+        const result = await this.aiService.analyzeNutrition(dto.imageUrl);
+        return {
+          ...result,
+          isCached: false,
+        };
+      } else {
+        return { error: '请提供图片 URL 或 Base64 数据' };
+      }
     }
 
     // 文字描述分析
@@ -102,34 +124,16 @@ export class AIController {
     @CurrentUser('userId') userId: string,
     @Body() dto: GenerateMealPlanDto,
   ) {
-    // 获取用户画像
-    const profile = await this.userService.getProfile(userId).catch(() => null);
-
-    // 构建用户画像数据
-    const userProfile = {
-      heightCm: dto.heightCm || profile?.heightCm,
-      weightKg: dto.weightKg || profile?.weightKg,
-      healthGoal: dto.healthGoal || profile?.healthGoal || '维持',
-      dailyCalorieGoal: dto.calorieTarget || profile?.dailyCalorieGoal || 2000,
-      mealCount: dto.mealCount || profile?.mealCount || 3,
-      flavorPrefs: dto.flavorPrefs || profile?.flavorPrefs || [],
-      allergyTags: profile?.allergyTags || [],
-      age: this.calculateAge(profile?.birthDate ?? undefined),
-      gender: profile?.gender,
-    };
-
-    // 调用AI生成食谱
-    const aiResult = await this.aiService.generateMealPlan(userProfile);
-
-    // 使用 MealPlanService 创建食谱
+    // 直接使用 MealPlanService 生成食谱（内部会调用AI）
+    // 避免在这里调用 aiService，防止重复生成
     const plan = await this.mealPlanService.generate(userId, {
-      calorieTarget: userProfile.dailyCalorieGoal,
-      mealCount: userProfile.mealCount,
-      healthGoal: userProfile.healthGoal,
-      flavorPrefs: userProfile.flavorPrefs,
-      heightCm: userProfile.heightCm,
-      weightKg: userProfile.weightKg,
-    });
+      calorieTarget: dto.calorieTarget || 2000,
+      mealCount: dto.mealCount || 3,
+      healthGoal: dto.healthGoal || '维持',
+      flavorPrefs: dto.flavorPrefs || [],
+      heightCm: dto.heightCm,
+      weightKg: dto.weightKg,
+    } as any);
 
     return plan;
   }

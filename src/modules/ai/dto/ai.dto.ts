@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum AnalyzeType {
@@ -11,10 +11,15 @@ export class AnalyzeNutritionDto {
   @IsEnum(AnalyzeType)
   type: AnalyzeType;
 
-  @ApiProperty({ description: '图片URL（拍照识别时）', required: false })
+  @ApiProperty({ description: '图片URL（拍照识别时，与 imageBase64 二选一）', required: false })
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @ApiProperty({ description: '图片 Base64 数据（拍照识别时，与 imageUrl 二选一）', required: false })
+  @IsString()
+  @IsOptional()
+  imageBase64?: string;
 
   @ApiProperty({ description: '图片哈希（用于缓存）', required: false })
   @IsString()
@@ -55,9 +60,10 @@ export class GenerateMealPlanDto {
   @IsOptional()
   healthGoal?: string;
 
-  @ApiProperty({ description: '口味偏好', type: [String], required: false })
-  @IsOptional()
-  flavorPrefs?: string[];
+  @ApiProperty({ description: '口味偏好', type: [String], example: ['清淡'] })
+  @IsArray()
+  @IsString({ each: true })
+  flavorPrefs: string[];
 
   @ApiProperty({ description: '身高(cm)', required: false })
   @IsNumber()
