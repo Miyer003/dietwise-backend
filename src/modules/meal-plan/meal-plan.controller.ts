@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { MealPlanService } from './meal-plan.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CreateMealPlanDto, GenerateMealPlanDto } from './dto/meal-plan.dto';
+import { CreateMealPlanDto, GenerateMealPlanDto, UpdateMealPlanDto } from './dto/meal-plan.dto';
 
 @ApiTags('食谱规划')
 @ApiBearerAuth()
@@ -46,6 +46,16 @@ export class MealPlanController {
   @ApiOperation({ summary: 'AI生成食谱' })
   async generate(@CurrentUser('userId') userId: string, @Body() dto: GenerateMealPlanDto) {
     return this.mealPlanService.generate(userId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: '更新食谱（支持部分更新设置或菜单）' })
+  async update(
+    @CurrentUser('userId') userId: string, 
+    @Param('id') id: string,
+    @Body() dto: UpdateMealPlanDto,
+  ) {
+    return this.mealPlanService.update(userId, id, dto);
   }
 
   @Patch(':id/activate')

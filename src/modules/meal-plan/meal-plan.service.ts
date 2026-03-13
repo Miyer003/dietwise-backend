@@ -197,6 +197,73 @@ export class MealPlanService {
     return this.getById(userId, saved.id);
   }
 
+  // 更新食谱（支持部分更新）
+  async update(userId: string, id: string, dto: any) {
+    const plan = await this.planRepo.findOne({
+      where: { id },
+      relations: ['days'],
+    });
+
+    if (!plan) {
+      throw new NotFoundException('食谱不存在');
+    }
+
+    if (plan.userId !== userId) {
+      throw new ForbiddenException('无权修改此食谱');
+    }
+
+    // 更新基本设置
+    const updateData: any = {};
+    if (dto.calorieTarget !== undefined) updateData.calorieTarget = dto.calorieTarget;
+    if (dto.mealCount !== undefined) updateData.mealCount = dto.mealCount;
+    if (dto.healthGoal !== undefined) updateData.healthGoal = dto.healthGoal;
+    if (dto.flavorPrefs !== undefined) updateData.flavorPrefs = dto.flavorPrefs;
+    
+    if (Object.keys(updateData).length > 0) {
+      await this.planRepo.update(id, updateData);
+    }
+
+    // 如果需要更新菜单
+    if (dto.updateDays && dto.days && dto.days.length > 0) {
+      // 删除旧的days
+      await this.dayRepo.delete({ planId: id });
+      
+      // 创建新的days
+      const dayEntities = dto.days.map((day: any) =>
+        this.dayRepo.create({
+          planId: id,
+          dayOfWeek: day.dayOfWeek,
+          mealType: day.mealType,
+          dishes: day.dishes.map((d: any) => ({
+            name: d.name,
+            quantity_g: d.quantityG || d.quantity_g || 100,
+            calories: d.calories,
+            protein_g: d.proteinG || d.protein_g || 0,
+            carbs_g: d.carbsG || d.carbs_g || 0,
+            fat_g: d.fatG || d.fat_g || 0,
+            cooking_tip: d.cookingTip || d.cooking_tip || '',
+          })),
+          totalCalories: day.totalCalories,
+          notes: day.notes || '',
+        }),
+      );
+      await this.dayRepo.save(dayEntities);
+    }
+
+    // 同步更新用户profile
+    const profileUpdate: any = {};
+    if (dto.calorieTarget !== undefined) profileUpdate.dailyCalorieGoal = dto.calorieTarget;
+    if (dto.mealCount !== undefined) profileUpdate.mealCount = dto.mealCount;
+    if (dto.healthGoal !== undefined) profileUpdate.healthGoal = dto.healthGoal;
+    if (dto.flavorPrefs !== undefined) profileUpdate.flavorPrefs = dto.flavorPrefs;
+    
+    if (Object.keys(profileUpdate).length > 0) {
+      await this.userService.updateProfile(userId, profileUpdate);
+    }
+
+    return this.getById(userId, id);
+  }
+
   // 激活食谱
   async activate(userId: string, id: string) {
     const plan = await this.planRepo.findOne({ where: { id } });

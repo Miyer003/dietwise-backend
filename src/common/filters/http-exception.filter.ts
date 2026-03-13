@@ -47,7 +47,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
           code = status * 100;
       }
       
-      message = exceptionResponse.message || message;
+      // 处理 message 可能是数组的情况（如验证错误）
+      const msg = exceptionResponse.message;
+      if (Array.isArray(msg)) {
+        message = msg.join('; ');
+      } else if (typeof msg === 'string') {
+        message = msg;
+      }
     }
 
     // 记录错误日志

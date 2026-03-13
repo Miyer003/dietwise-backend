@@ -134,3 +134,38 @@ export class GenerateMealPlanDto {
   @IsOptional()
   cookingDifficulty?: string;
 }
+
+// 新增：更新食谱DTO
+export class UpdateMealPlanDto {
+  @ApiProperty({ description: '每日热量目标', example: 2000, required: false })
+  @IsNumber()
+  @IsOptional()
+  calorieTarget?: number;
+
+  @ApiProperty({ description: '每日餐次数', example: 3, required: false })
+  @IsNumber()
+  @IsOptional()
+  mealCount?: number;
+
+  @ApiProperty({ description: '健康目标', example: '减脂', required: false })
+  @IsString()
+  @IsOptional()
+  healthGoal?: string;
+
+  @ApiProperty({ description: '口味偏好', example: ['清淡', '少油'], required: false })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  flavorPrefs?: string[];
+
+  @ApiProperty({ description: '是否更新菜单（如果不传或false，则只更新设置）', example: true, required: false })
+  @IsOptional()
+  updateDays?: boolean;
+
+  @ApiProperty({ description: '食谱明细（仅在updateDays为true时需要）', type: [MealPlanDayDto], required: false })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MealPlanDayDto)
+  @IsOptional()
+  days?: MealPlanDayDto[];
+}
