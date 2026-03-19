@@ -14,6 +14,12 @@ export class UpdateUserDto {
   @Length(1, 10)
   @IsOptional()
   avatarEmoji?: string;
+
+  @ApiProperty({ description: '头像URL', example: 'https://minio.example.com/avatars/xxx.jpg', required: false })
+  @IsString()
+  @Length(0, 255)
+  @IsOptional()
+  avatarUrl?: string;
 }
 
 export class UpdateUserProfileDto {

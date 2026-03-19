@@ -44,7 +44,8 @@ export class MinioService {
 
   getPublicUrl(objectName: string): string {
     const protocol = this.config.get('app.minio.useSSL') ? 'https' : 'http';
-    const endpoint = this.config.get('app.minio.endPoint');
+    // 优先使用 PUBLIC_ENDPOINT（供手机/外部访问），否则使用内部 ENDPOINT
+    const endpoint = this.config.get('app.minio.publicEndpoint') || this.config.get('app.minio.endPoint');
     const port = this.config.get('app.minio.port');
     return `${protocol}://${endpoint}:${port}/${this.bucketName}/${objectName}`;
   }

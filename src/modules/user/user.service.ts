@@ -71,6 +71,7 @@ export class UserService {
       phone: user.phone,
       nickname: user.nickname,
       avatarEmoji: user.avatarEmoji,
+      avatarUrl: user.avatarUrl,
       role: user.role,
       status: user.status,
       createdAt: user.createdAt,
@@ -90,6 +91,9 @@ export class UserService {
     }
     if (dto.avatarEmoji !== undefined) {
       user.avatarEmoji = dto.avatarEmoji;
+    }
+    if (dto.avatarUrl !== undefined) {
+      user.avatarUrl = dto.avatarUrl;
     }
 
     return this.userRepo.save(user);

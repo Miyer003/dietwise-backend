@@ -6,11 +6,13 @@ import { User } from './entities/user.entity';
 import { UserProfile } from './entities/user-profile.entity';
 import { DietRecord } from '../diet/entities/diet-record.entity';
 import { AchievementModule } from '../achievement/achievement.module';
+import { MinioModule } from '../../shared/minio/minio.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, UserProfile, DietRecord]),
     AchievementModule,
+    MinioModule,
   ],
   controllers: [UserController],
   providers: [UserService],

@@ -28,6 +28,7 @@ export default registerAs('app', () => ({
   
   minio: {
     endPoint: process.env.MINIO_ENDPOINT,
+    publicEndpoint: process.env.MINIO_PUBLIC_ENDPOINT,
     port: parseInt(process.env.MINIO_PORT || '9000', 10),
     useSSL: process.env.MINIO_USE_SSL === 'true',
     accessKey: process.env.MINIO_ACCESS_KEY,

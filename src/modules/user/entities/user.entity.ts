@@ -30,6 +30,9 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 10, name: 'avatar_emoji', default: '🥗' })
   avatarEmoji: string;
 
+  @Column({ type: 'varchar', length: 255, name: 'avatar_url', nullable: true })
+  avatarUrl: string;
+
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role: UserRole;
 

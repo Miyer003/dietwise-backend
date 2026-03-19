@@ -1,7 +1,8 @@
-import { Controller, Get, Patch, Put, Delete, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Put, Delete, Body, Query, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { AchievementService } from '../achievement/achievement.service';
+import { MinioService } from '../../shared/minio/minio.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UpdateUserDto, UpdateUserProfileDto } from './dto/user.dto';
@@ -14,6 +15,7 @@ export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly achievementService: AchievementService,
+    private readonly minioService: MinioService,
   ) {}
 
   @Get('me')
@@ -83,5 +85,22 @@ export class UserController {
   async markAchievementsRead(@CurrentUser('userId') userId: string) {
     await this.achievementService.markAsRead(userId);
     return { message: '已标记为已读' };
+  }
+
+  @Post('me/avatar/upload-url')
+  @ApiOperation({ summary: '获取头像上传预签名URL' })
+  async getAvatarUploadUrl(
+    @CurrentUser('userId') userId: string,
+    @Query('filename') filename: string,
+  ) {
+    const objectName = `avatars/${userId}/${Date.now()}_${filename}`;
+    const uploadUrl = await this.minioService.getPresignedPutUrl(objectName, 600);
+    const avatarUrl = this.minioService.getPublicUrl(objectName);
+    
+    return { 
+      uploadUrl, 
+      objectName,
+      avatarUrl, // 上传成功后这个 URL 可以直接使用
+    };
   }
 }
