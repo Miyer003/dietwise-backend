@@ -99,3 +99,14 @@ export class ChatDto {
   @IsOptional()
   includeContext?: boolean;
 }
+
+export class AnalyzeVoiceDto {
+  @ApiProperty({ description: '音频文件 Base64 数据', required: true })
+  @IsString()
+  audioBase64: string;
+
+  @ApiProperty({ description: '音频 MIME 类型', example: 'audio/wav', required: false })
+  @IsString()
+  @IsOptional()
+  mimeType?: string;
+}

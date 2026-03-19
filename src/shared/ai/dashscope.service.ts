@@ -173,4 +173,128 @@ export class DashscopeService {
       throw error;
     }
   }
+
+  // 语音识别：使用 qwen-omni-turbo 全模态模型（Dashscope 原生 API）
+  async speechToText(audioBase64: string, mimeType?: string): Promise<string> {
+    try {
+      this.logger.log(`开始语音识别，mimeType: ${mimeType}, 音频长度: ${audioBase64.length}`);
+      
+      // 确定音频格式并构建 data URL
+      const format = mimeType?.includes('wav') ? 'wav' : 
+                    mimeType?.includes('m4a') ? 'm4a' : 
+                    mimeType?.includes('mp3') ? 'mp3' : 'mp3';
+      const audioDataUrl = `data:audio/${format};base64,${audioBase64}`;
+      
+      // 获取配置的音频模型
+      const audioModel = this.config.get('app.ai.dashscope.audioModel') || 'qwen-omni-turbo';
+      this.logger.log(`使用模型: ${audioModel}`);
+      
+      // 使用 Dashscope 原生 API 调用 qwen-omni-turbo 模型
+      const response = await lastValueFrom(
+        this.http.post(
+          'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+          {
+            model: audioModel,
+            input: {
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { audio: audioDataUrl },
+                    { text: '请识别这段音频中的文字内容，只返回识别出的文字，不要添加任何解释或标点符号。' }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      // 解析响应
+      const choices = (response as any).data?.output?.choices;
+      if (choices && choices.length > 0) {
+        const content = choices[0].message?.content;
+        let text = '';
+        
+        // 处理多模态返回格式
+        if (Array.isArray(content)) {
+          // 查找 text 类型的内容
+          const textItem = content.find((item: any) => item.text);
+          text = textItem?.text || '';
+        } else if (typeof content === 'string') {
+          text = content;
+        }
+        
+        this.logger.log(`语音识别成功: ${text}`);
+        
+        // 清理返回的内容（去除可能的描述性文字）
+        text = text.trim()
+          .replace(/^这段音频中包含的文字是：['"]/, '')
+          .replace(/['"]$/g, '')
+          .replace(/^["']|["']$/g, '');
+        
+        return text;
+      }
+      
+      throw new Error('语音识别返回空结果');
+    } catch (error: any) {
+      this.logger.error(`语音识别失败: ${error.message}`);
+      if (error.response?.data) {
+        this.logger.error('错误详情:', JSON.stringify(error.response.data));
+      }
+      
+      // 如果全模态模型失败，尝试使用 Paraformer 专用语音模型
+      return this.fallbackSpeechToText(audioBase64, mimeType);
+    }
+  }
+
+  // 备选语音识别：使用 Paraformer 专用语音模型
+  private async fallbackSpeechToText(audioBase64: string, mimeType?: string): Promise<string> {
+    try {
+      this.logger.log('使用备选方案：Paraformer 语音识别');
+      
+      const format = mimeType?.includes('wav') ? 'wav' : 
+                    mimeType?.includes('m4a') ? 'm4a' : 'mp3';
+      
+      const response = await lastValueFrom(
+        this.http.post(
+          'https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription',
+          {
+            model: 'paraformer-v2',
+            input: {
+              audio: audioBase64,
+            },
+            parameters: {
+              format: format,
+              sample_rate: 16000,
+              disfluency_removal_enabled: true,
+            }
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const result = (response as any).data?.output?.text || '';
+      if (result) {
+        this.logger.log(`备选语音识别成功: ${result}`);
+        return result.trim();
+      }
+      throw new Error('备选语音识别返回空结果');
+    } catch (error: any) {
+      this.logger.error(`备选语音识别也失败: ${error.message}`);
+      // 返回空字符串，让上层触发智能猜测
+      return '';
+    }
+  }
 }

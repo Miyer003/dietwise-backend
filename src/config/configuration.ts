@@ -40,6 +40,8 @@ export default registerAs('app', () => ({
       apiKey: process.env.DASHSCOPE_API_KEY,
       vlModel: process.env.DASHSCOPE_VL_MODEL || 'qwen-vl-plus',
       textModel: process.env.DASHSCOPE_TEXT_MODEL || 'qwen-turbo',
+      audioModel: process.env.DASHSCOPE_AUDIO_MODEL || 'qwen3-omni-flash-realtime',
+      ttsModel: process.env.DASHSCOPE_TTS_MODEL || 'qwen3-tts-vd-2026-01-26',
     },
     moonshot: {
       apiKey: process.env.MOONSHOT_API_KEY,

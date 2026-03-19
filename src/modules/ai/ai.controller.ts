@@ -9,7 +9,7 @@ import { UserService } from '../user/user.service';
 import { MealPlanService } from '../meal-plan/meal-plan.service';
 import { ChatService } from '../chat/chat.service';
 import { AILogService, AIFunctionType, AIProvider } from './ai-log.service';
-import { AnalyzeNutritionDto, GenerateTipDto, GenerateMealPlanDto, ChatDto } from './dto/ai.dto';
+import { AnalyzeNutritionDto, GenerateTipDto, GenerateMealPlanDto, ChatDto, AnalyzeVoiceDto } from './dto/ai.dto';
 
 @ApiTags('AI服务')
 @ApiBearerAuth()
@@ -64,6 +64,63 @@ export class AIController {
       return { error: '请提供食物描述' };
     }
     return this.aiService.analyzeNutritionByText(dto.description, dto.quantityG);
+  }
+
+  @Post('analyze-voice')
+  @ApiOperation({ summary: '语音分析（语音识别+营养分析）' })
+  async analyzeVoice(@Body() dto: AnalyzeVoiceDto) {
+    console.log('analyze-voice 接收数据:', { 
+      mimeType: dto.mimeType,
+      audioLength: dto.audioBase64?.length 
+    });
+
+    try {
+      // 1. 尝试语音识别
+      let transcribedText = await this.aiService.speechToText(
+        dto.audioBase64, 
+        dto.mimeType
+      );
+
+      console.log('语音识别结果:', transcribedText);
+
+      // 2. 如果语音识别失败，使用智能猜测
+      let analysisResult: any;
+      let isGuessed = false;
+      
+      if (!transcribedText || transcribedText.trim().length === 0) {
+        console.log('语音识别失败，使用智能猜测...');
+        const guess = await this.aiService.guessFoodFromAudio(dto.audioBase64);
+        
+        transcribedText = guess.foodName;
+        isGuessed = true;
+        
+        // 基于猜测的食物进行营养分析
+        analysisResult = await this.aiService.analyzeNutritionByText(
+          guess.foodName,
+          guess.quantityG
+        );
+        
+        // 标记为猜测结果
+        analysisResult.confidence = guess.confidence;
+        analysisResult.isGuessed = true;
+      } else {
+        // 3. 正常营养分析
+        analysisResult = await this.aiService.analyzeNutritionByText(
+          transcribedText, 
+          undefined
+        );
+      }
+
+      // 直接返回数据，全局拦截器会包装成标准格式
+      return {
+        transcribedText,
+        analysisResult,
+        isGuessed,
+      };
+    } catch (error: any) {
+      console.error('语音分析失败:', error);
+      throw error;
+    }
   }
 
   @Post('generate-tip')

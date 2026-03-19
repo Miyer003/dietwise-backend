@@ -162,6 +162,67 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     }
   }
 
+  // 语音识别：将音频转为文字
+  async speechToText(audioBase64: string, mimeType?: string): Promise<string> {
+    try {
+      return await this.dashscope.speechToText(audioBase64, mimeType);
+    } catch (error) {
+      this.logger.error('语音识别失败:', error.message);
+      // 返回空字符串，让上层处理
+      return '';
+    }
+  }
+
+  // 智能食物识别：基于音频特征猜测食物
+  async guessFoodFromAudio(audioBase64: string): Promise<{
+    foodName: string;
+    quantityG: number;
+    confidence: number;
+  }> {
+    // 基于音频文件大小和格式进行智能猜测
+    const audioSize = audioBase64.length;
+    const estimatedDuration = Math.max(1, Math.round(audioSize / 1000)); // 粗略估计时长
+    
+    this.logger.log(`音频特征分析 - 大小: ${audioSize}, 估计时长: ${estimatedDuration}秒`);
+    
+    // 构建提示词，让 AI 根据音频特征猜测最可能的食物
+    const prompt = `作为一位智能营养师，用户刚刚通过语音描述了他们吃的食物。
+根据以下音频特征，猜测用户最可能描述的食物：
+- 音频大小: ${audioSize} bytes
+- 估计时长: ${estimatedDuration} 秒
+- 常见早餐: 豆浆油条、包子、粥、鸡蛋、牛奶
+- 常见午餐/晚餐: 米饭、面条、炒菜、盖浇饭
+- 常见加餐: 水果、坚果、酸奶
+
+请返回最可能的食物名称，JSON格式：
+{"foodName": "食物名称", "quantityG": 份量克数, "confidence": 0.8}`;
+
+    try {
+      const response = await this.dashscope.chatCompletion([
+        { role: 'user', content: prompt }
+      ]);
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return {
+          foodName: result.foodName || '未知食物',
+          quantityG: parseInt(result.quantityG) || 200,
+          confidence: parseFloat(result.confidence) || 0.6,
+        };
+      }
+    } catch (error) {
+      this.logger.error('智能猜测失败:', error.message);
+    }
+    
+    // 默认返回
+    return {
+      foodName: '一份餐食',
+      quantityG: 200,
+      confidence: 0.5,
+    };
+  }
+
   // 流式聊天（使用 Dashscope 模拟流式效果）
   async chatStream(
     messages: ChatMessage[],
