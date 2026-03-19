@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -8,6 +9,13 @@ import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  
+  // 获取服务配置
+  const port = configService.get('app.port') || 3000;
+  const host = configService.get('app.host') || '0.0.0.0';
+  const devMode = configService.get('app.devMode') || 'local';
+  const devHost = configService.get('app.devHost') || 'localhost';
 
   // 配置 body parser，允许空请求体，增加大小限制以支持 base64 图片
   app.use(bodyParser.json({ 
@@ -52,9 +60,17 @@ async function bootstrap() {
     SwaggerModule.setup('api-docs', app, document);
   }
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0'); // 监听所有网络接口
-  console.log(`🚀 服务启动: http://0.0.0.0:${port}`);
-  console.log(`📚 API文档: http://0.0.0.0:${port}/api-docs`);
+  await app.listen(port, host);
+  
+  // 根据模式显示不同的访问地址
+  if (devMode === 'lan') {
+    console.log(`🚀 服务启动 (局域网模式)`);
+    console.log(`   本机访问: http://localhost:${port}`);
+    console.log(`   局域网访问: http://${devHost}:${port}`);
+    console.log(`   API文档: http://${devHost}:${port}/api-docs`);
+  } else {
+    console.log(`🚀 服务启动 (本机模式): http://localhost:${port}`);
+    console.log(`📚 API文档: http://localhost:${port}/api-docs`);
+  }
 }
 bootstrap();
