@@ -32,8 +32,12 @@ export class FoodController {
 
   @Get('recent')
   @ApiOperation({ summary: '获取最近常吃的食物Top10' })
-  async getRecent(@CurrentUser('userId') userId: string) {
-    return this.foodService.getRecent(userId);
+  @ApiQuery({ name: 'limit', description: '返回数量限制', required: false })
+  async getRecent(
+    @CurrentUser('userId') userId: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.foodService.getRecent(userId, limit || 10);
   }
 
   @Get('semantic/search')

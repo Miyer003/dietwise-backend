@@ -2,12 +2,34 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { FoodItem } from './entities/food-item.entity';
+import { DietRecordItem } from '../diet/entities/diet-record-item.entity';
+
+// 最近常吃的食物 - 仅包含前端需要的字段
+export interface RecentFoodItem {
+  id?: string;  // 食物库ID，可能为空（AI识别的自定义食物）
+  name: string;
+  namePinyin?: string;
+  nameAliases?: string[];
+  category: string;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+  fiberPer100g?: number;
+  sodiumPer100g?: number;
+  defaultPortionG?: number;
+  isVerified?: boolean;
+  recordCount: number;
+  lastRecordedAt?: Date;
+}
 
 @Injectable()
 export class FoodService {
   constructor(
     @InjectRepository(FoodItem)
     private readonly foodRepo: Repository<FoodItem>,
+    @InjectRepository(DietRecordItem)
+    private readonly recordItemRepo: Repository<DietRecordItem>,
   ) {}
 
   // 搜索食物（中文+拼音模糊搜索）
@@ -59,15 +81,149 @@ export class FoodService {
     return item;
   }
 
-  // 获取最近常吃的食物（简化实现，实际应根据用户的diet_records统计）
-  async getRecent(userId: string) {
-    // TODO: 实际应该查询diet_record_items，获取用户最常记录的食物
-    // 这里返回一些常见的食物作为示例
-    return this.foodRepo.find({
-      where: { isVerified: true },
-      order: { name: 'ASC' },
-      take: 10,
-    });
+  // 获取最近常吃的食物（基于用户饮食记录统计）
+  async getRecent(userId: string, limit: number = 10): Promise<RecentFoodItem[]> {
+    console.log(`[getRecent] 开始查询用户 ${userId} 的最近常吃食物, limit=${limit}`);
+    
+    // 查询用户的饮食记录项，统计每种食物的出现次数和最近记录时间
+    // 支持两种情况：
+    // 1. 有 foodItemId 的记录（来自食物库）- 按 foodItemId 分组
+    // 2. 没有 foodItemId 的记录（AI拍照/语音自定义输入）- 按 foodName 分组
+    const recentFoods = await this.recordItemRepo
+      .createQueryBuilder('item')
+      .select([
+        'item.foodItemId as "foodItemId"',
+        'item.foodName as "foodName"',
+        'COUNT(item.id) as "recordCount"',
+        'MAX(item.createdAt) as "lastRecordedAt"',
+      ])
+      .where('item.userId = :userId', { userId })
+      .groupBy('item.foodItemId')
+      .addGroupBy('item.foodName')
+      .orderBy('"recordCount"', 'DESC')
+      .addOrderBy('"lastRecordedAt"', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    console.log(`[getRecent] 查询到 ${recentFoods.length} 条记录`, JSON.stringify(recentFoods, null, 2));
+
+    if (recentFoods.length === 0) {
+      // 如果用户没有记录，返回食物库中的前 N 个作为推荐
+      // 优先返回已验证的，如果没有则返回任意食物
+      let defaultFoods = await this.foodRepo.find({
+        where: { isVerified: true },
+        order: { name: 'ASC' },
+        take: limit,
+      });
+      
+      // 如果没有已验证的食物，返回任意食物
+      if (defaultFoods.length === 0) {
+        defaultFoods = await this.foodRepo.find({
+          order: { createdAt: 'DESC' },
+          take: limit,
+        });
+      }
+      
+      console.log(`[getRecent] 返回 ${defaultFoods.length} 条默认推荐食物`);
+      
+      return defaultFoods.map(food => ({
+        id: food.id,
+        name: food.name,
+        namePinyin: food.namePinyin,
+        nameAliases: food.nameAliases,
+        category: food.category,
+        caloriesPer100g: Number(food.caloriesPer100g) || 0,
+        proteinPer100g: Number(food.proteinPer100g) || 0,
+        carbsPer100g: Number(food.carbsPer100g) || 0,
+        fatPer100g: Number(food.fatPer100g) || 0,
+        fiberPer100g: Number(food.fiberPer100g) || 0,
+        sodiumPer100g: Number(food.sodiumPer100g) || 0,
+        defaultPortionG: Number(food.defaultPortionG) || 100,
+        isVerified: food.isVerified,
+        recordCount: 0,
+        lastRecordedAt: undefined,
+      }));
+    }
+
+    // 获取有 foodItemId 的食物详情
+    const foodIds = recentFoods.map(f => f.foodItemId).filter(id => id);
+    const foodDetails = await this.foodRepo.findByIds(foodIds);
+    const foodMap = new Map(foodDetails.map(f => [f.id, f]));
+
+    // 合并数据 - 返回所有用户吃过的食物
+    // 1. 有 foodItemId 的：从食物库获取完整信息
+    // 2. 没有 foodItemId 的：使用记录中的 foodName，并尝试模糊匹配食物库
+    const result: RecentFoodItem[] = [];
+    
+    for (const item of recentFoods) {
+      const recordCount = parseInt(item.recordCount, 10);
+      
+      if (item.foodItemId && foodMap.has(item.foodItemId)) {
+        // 情况1：有关联的食物库记录
+        const food = foodMap.get(item.foodItemId)!;
+        result.push({
+          id: food.id,
+          name: food.name,
+          namePinyin: food.namePinyin,
+          nameAliases: food.nameAliases,
+          category: food.category,
+          caloriesPer100g: Number(food.caloriesPer100g) || 0,
+          proteinPer100g: Number(food.proteinPer100g) || 0,
+          carbsPer100g: Number(food.carbsPer100g) || 0,
+          fatPer100g: Number(food.fatPer100g) || 0,
+          fiberPer100g: Number(food.fiberPer100g) || 0,
+          sodiumPer100g: Number(food.sodiumPer100g) || 0,
+          defaultPortionG: Number(food.defaultPortionG) || 100,
+          isVerified: food.isVerified,
+          recordCount,
+          lastRecordedAt: item.lastRecordedAt,
+        });
+      } else {
+        // 情况2：AI识别的自定义食物（没有foodItemId）
+        // 尝试根据名字模糊匹配食物库
+        const matchedFood = await this.findFoodByName(item.foodName);
+        
+        if (matchedFood) {
+          // 找到匹配的食物，使用食物库数据
+          result.push({
+            id: matchedFood.id,
+            name: item.foodName,  // 保持用户记录的原始名字
+            namePinyin: matchedFood.namePinyin,
+            nameAliases: matchedFood.nameAliases,
+            category: matchedFood.category,
+            caloriesPer100g: Number(matchedFood.caloriesPer100g) || 0,
+            proteinPer100g: Number(matchedFood.proteinPer100g) || 0,
+            carbsPer100g: Number(matchedFood.carbsPer100g) || 0,
+            fatPer100g: Number(matchedFood.fatPer100g) || 0,
+            fiberPer100g: Number(matchedFood.fiberPer100g) || 0,
+            sodiumPer100g: Number(matchedFood.sodiumPer100g) || 0,
+            defaultPortionG: Number(matchedFood.defaultPortionG) || 100,
+            isVerified: matchedFood.isVerified,
+            recordCount,
+            lastRecordedAt: item.lastRecordedAt,
+          });
+        } else {
+          // 没有找到匹配，使用自定义数据（无id，表示不在食物库中）
+          result.push({
+            name: item.foodName,
+            category: '其他',
+            caloriesPer100g: 0,
+            proteinPer100g: 0,
+            carbsPer100g: 0,
+            fatPer100g: 0,
+            fiberPer100g: 0,
+            sodiumPer100g: 0,
+            defaultPortionG: 100,
+            isVerified: false,
+            recordCount,
+            lastRecordedAt: item.lastRecordedAt,
+          });
+        }
+      }
+    }
+    
+    console.log(`[getRecent] 返回 ${result.length} 条用户真实记录`, JSON.stringify(result.slice(0, 2), null, 2));
+    return result;
   }
 
   // 语义搜索（RAG）- 简化实现
@@ -75,6 +231,29 @@ export class FoodService {
     // TODO: 实际应使用pgvector进行向量相似度搜索
     // 这里先使用简单的文本搜索作为回退
     return this.search(query, undefined, 10);
+  }
+
+  // 根据名字查找食物（模糊匹配）
+  private async findFoodByName(name: string): Promise<FoodItem | null> {
+    if (!name) return null;
+    
+    // 首先尝试精确匹配
+    let food = await this.foodRepo.findOne({
+      where: { name },
+    });
+    
+    if (food) return food;
+    
+    // 尝试包含匹配（名字包含查询词或查询词包含名字）
+    const foods = await this.foodRepo
+      .createQueryBuilder('food')
+      .where('food.name ILIKE :name', { name: `%${name}%` })
+      .orWhere(':name ILIKE food.name', { name: `%${name}%` })
+      .orderBy('food.isVerified', 'DESC')
+      .limit(1)
+      .getMany();
+    
+    return foods.length > 0 ? foods[0] : null;
   }
 
   // 批量创建食物（用于导入数据）
