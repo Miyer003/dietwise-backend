@@ -83,7 +83,6 @@ export class FoodService {
 
   // 获取最近常吃的食物（基于用户饮食记录统计）
   async getRecent(userId: string, limit: number = 10): Promise<RecentFoodItem[]> {
-    console.log(`[getRecent] 开始查询用户 ${userId} 的最近常吃食物, limit=${limit}`);
     
     // 查询用户的饮食记录项，统计每种食物的出现次数和最近记录时间
     // 支持两种情况：
@@ -105,7 +104,7 @@ export class FoodService {
       .limit(limit)
       .getRawMany();
 
-    console.log(`[getRecent] 查询到 ${recentFoods.length} 条记录`, JSON.stringify(recentFoods, null, 2));
+
 
     if (recentFoods.length === 0) {
       // 如果用户没有记录，返回食物库中的前 N 个作为推荐
@@ -124,7 +123,7 @@ export class FoodService {
         });
       }
       
-      console.log(`[getRecent] 返回 ${defaultFoods.length} 条默认推荐食物`);
+
       
       return defaultFoods.map(food => ({
         id: food.id,
@@ -222,7 +221,6 @@ export class FoodService {
       }
     }
     
-    console.log(`[getRecent] 返回 ${result.length} 条用户真实记录`, JSON.stringify(result.slice(0, 2), null, 2));
     return result;
   }
 

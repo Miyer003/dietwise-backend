@@ -154,7 +154,7 @@ export class MealPlanService {
 
     // 解析AI返回的食谱数据
     const parsedPlan = this.parseAIResponse(aiResult);
-    console.log(`解析完成，共 ${parsedPlan.days.length} 条记录`);
+
 
     // 创建食谱记录
     const plan = this.planRepo.create({
@@ -351,10 +351,7 @@ export class MealPlanService {
   } {
     const days: ReturnType<typeof this.parseAIResponse>['days'] = [];
 
-    // 打印AI原始响应用于调试
-    console.log('=== AI原始响应 ===');
-    console.log(aiText.substring(0, 2000));
-    console.log('==================');
+
 
     try {
       // 清理AI响应，去除markdown代码块标记
@@ -364,21 +361,18 @@ export class MealPlanService {
       const jsonStartIndex = cleanText.indexOf('{');
       const jsonEndIndex = cleanText.lastIndexOf('}');
       
-      if (jsonStartIndex === -1 || jsonEndIndex === -1 || jsonStartIndex >= jsonEndIndex) {
-        console.log('未找到有效的JSON格式');
-      } else {
+      if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonStartIndex < jsonEndIndex) {
         const jsonString = cleanText.substring(jsonStartIndex, jsonEndIndex + 1);
         
         try {
           const parsed = JSON.parse(jsonString);
-          console.log('JSON解析成功，结构:', Object.keys(parsed));
+
           
           // 处理新的结构化格式 { days: [{ dayOfWeek, meals: [...], dailyNutrition }] }
           if (parsed.days && Array.isArray(parsed.days)) {
-            console.log(`找到 ${parsed.days.length} 天的数据`);
+
             
             for (const day of parsed.days) {
-              console.log(`处理第${day.dayOfWeek}天，meals:`, day.meals?.length || 0);
               
               if (day.meals && Array.isArray(day.meals)) {
                 for (const meal of day.meals) {
@@ -403,7 +397,7 @@ export class MealPlanService {
                   
                   const totalCalories = parseInt(meal.mealCalories) || dishes.reduce((sum: number, d: any) => sum + (d.calories || 0), 0);
                   
-                  console.log(`  ${meal.mealType}: ${dishes.length}道菜, ${totalCalories}kcal`);
+
                   
                   days.push({
                     dayOfWeek: day.dayOfWeek || 1,
@@ -417,20 +411,16 @@ export class MealPlanService {
             }
             
             if (days.length > 0) {
-              console.log(`解析成功，共${days.length}条记录`);
               return { days };
             }
-          } else {
-            console.log('未找到days数组或格式不正确');
           }
           
           // 兼容旧格式 { days: [{ dayOfWeek, mealType, dishes }] }
           if (parsed.days && Array.isArray(parsed.days) && parsed.days[0]?.mealType) {
-            console.log('使用旧格式解析');
             return { days: parsed.days };
           }
         } catch (jsonError: any) {
-          console.log('JSON解析失败:', jsonError.message);
+          // JSON解析失败，继续尝试正则提取
         }
       }
 
@@ -539,12 +529,12 @@ export class MealPlanService {
         });
       }
     } catch (error) {
-      console.error('解析AI食谱响应失败:', error);
+      // 解析失败，返回默认结构
     }
 
     // 如果没有解析到任何数据，返回默认结构
     if (days.length === 0) {
-      console.log('未解析到任何食谱数据，使用默认模板');
+
       // 生成默认的一周食谱结构
       for (let day = 1; day <= 7; day++) {
         for (const meal of ['breakfast', 'lunch', 'dinner']) {

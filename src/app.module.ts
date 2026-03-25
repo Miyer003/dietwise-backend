@@ -17,6 +17,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { BadgeModule } from './modules/badge/badge.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { AIModule as AIFeatureModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -55,6 +56,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     AchievementModule,
     FeedbackModule,
     AdminModule,
+    BadgeModule,
     SyncModule,
     AIFeatureModule,
   ],

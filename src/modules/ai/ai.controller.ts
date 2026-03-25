@@ -29,17 +29,9 @@ export class AIController {
   @Post('analyze-nutrition')
   @ApiOperation({ summary: 'AI营养分析（图片/文字）' })
   async analyzeNutrition(@Body() dto: AnalyzeNutritionDto) {
-    console.log('analyze-nutrition 接收数据:', { 
-      type: dto.type, 
-      hasBase64: !!dto.imageBase64,
-      base64Length: dto.imageBase64?.length,
-      hasUrl: !!dto.imageUrl 
-    });
-    
     // 图片分析（支持 URL 或 Base64）
     if (dto.type === 'image') {
       if (dto.imageBase64) {
-        console.log('使用 Base64 分析，长度:', dto.imageBase64.length);
         // 使用 Base64 图片
         const result = await this.aiService.analyzeNutritionByBase64(dto.imageBase64);
         return {
@@ -47,7 +39,6 @@ export class AIController {
           isCached: false,
         };
       } else if (dto.imageUrl) {
-        console.log('使用 URL 分析:', dto.imageUrl);
         // 使用 URL 图片
         const result = await this.aiService.analyzeNutrition(dto.imageUrl);
         return {
@@ -69,11 +60,6 @@ export class AIController {
   @Post('analyze-voice')
   @ApiOperation({ summary: '语音分析（语音识别+营养分析）' })
   async analyzeVoice(@Body() dto: AnalyzeVoiceDto) {
-    console.log('analyze-voice 接收数据:', { 
-      mimeType: dto.mimeType,
-      audioLength: dto.audioBase64?.length 
-    });
-
     try {
       // 1. 尝试语音识别
       let transcribedText = await this.aiService.speechToText(
@@ -81,14 +67,11 @@ export class AIController {
         dto.mimeType
       );
 
-      console.log('语音识别结果:', transcribedText);
-
       // 2. 如果语音识别失败，使用智能猜测
       let analysisResult: any;
       let isGuessed = false;
       
       if (!transcribedText || transcribedText.trim().length === 0) {
-        console.log('语音识别失败，使用智能猜测...');
         const guess = await this.aiService.guessFoodFromAudio(dto.audioBase64);
         
         transcribedText = guess.foodName;
@@ -118,7 +101,6 @@ export class AIController {
         isGuessed,
       };
     } catch (error: any) {
-      console.error('语音分析失败:', error);
       throw error;
     }
   }

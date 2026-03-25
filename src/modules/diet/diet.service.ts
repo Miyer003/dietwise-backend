@@ -463,8 +463,6 @@ export class DietService {
     // 转换为数组并限制数量
     const uniqueDates = Array.from(dateSet).slice(0, limit);
     
-    console.log('[getDatesWithRecords] 找到的唯一日期:', uniqueDates);
-
     return uniqueDates.map(date => ({
       date,
       hasRecord: true,
