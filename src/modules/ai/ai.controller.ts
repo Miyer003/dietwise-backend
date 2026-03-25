@@ -28,38 +28,80 @@ export class AIController {
 
   @Post('analyze-nutrition')
   @ApiOperation({ summary: 'AI营养分析（图片/文字）' })
-  async analyzeNutrition(@Body() dto: AnalyzeNutritionDto) {
-    // 图片分析（支持 URL 或 Base64）
-    if (dto.type === 'image') {
-      if (dto.imageBase64) {
-        // 使用 Base64 图片
-        const result = await this.aiService.analyzeNutritionByBase64(dto.imageBase64);
+  async analyzeNutrition(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: AnalyzeNutritionDto,
+  ) {
+    const startTime = Date.now();
+    
+    try {
+      // 图片分析（支持 URL 或 Base64）
+      if (dto.type === 'image') {
+        let result;
+        if (dto.imageBase64) {
+          result = await this.aiService.analyzeNutritionByBase64(dto.imageBase64);
+        } else if (dto.imageUrl) {
+          result = await this.aiService.analyzeNutrition(dto.imageUrl);
+        } else {
+          return { error: '请提供图片 URL 或 Base64 数据' };
+        }
+        
+        // 记录AI调用日志
+        await this.aiLogService.createLog({
+          userId,
+          functionType: AIFunctionType.NUTRITION_ANALYSIS,
+          provider: AIProvider.DASHSCOPE,
+          modelName: 'qwen-vl-plus',
+          latencyMs: Date.now() - startTime,
+          success: true,
+        });
+        
         return {
           ...result,
           isCached: false,
         };
-      } else if (dto.imageUrl) {
-        // 使用 URL 图片
-        const result = await this.aiService.analyzeNutrition(dto.imageUrl);
-        return {
-          ...result,
-          isCached: false,
-        };
-      } else {
-        return { error: '请提供图片 URL 或 Base64 数据' };
       }
-    }
 
-    // 文字描述分析
-    if (!dto.description) {
-      return { error: '请提供食物描述' };
+      // 文字描述分析
+      if (!dto.description) {
+        return { error: '请提供食物描述' };
+      }
+      
+      const result = await this.aiService.analyzeNutritionByText(dto.description, dto.quantityG);
+      
+      // 记录AI调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.NUTRITION_ANALYSIS,
+        provider: AIProvider.DASHSCOPE,
+        modelName: 'qwen-turbo',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+      
+      return result;
+    } catch (error) {
+      // 记录失败日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.NUTRITION_ANALYSIS,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error.message,
+      });
+      throw error;
     }
-    return this.aiService.analyzeNutritionByText(dto.description, dto.quantityG);
   }
 
   @Post('analyze-voice')
   @ApiOperation({ summary: '语音分析（语音识别+营养分析）' })
-  async analyzeVoice(@Body() dto: AnalyzeVoiceDto) {
+  async analyzeVoice(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: AnalyzeVoiceDto,
+  ) {
+    const startTime = Date.now();
+    
     try {
       // 1. 尝试语音识别
       let transcribedText = await this.aiService.speechToText(
@@ -94,13 +136,30 @@ export class AIController {
         );
       }
 
-      // 直接返回数据，全局拦截器会包装成标准格式
+      // 记录AI调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.VOICE_ANALYSIS,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
       return {
         transcribedText,
         analysisResult,
         isGuessed,
       };
     } catch (error: any) {
+      // 记录失败日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.VOICE_ANALYSIS,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error.message,
+      });
       throw error;
     }
   }
@@ -108,6 +167,8 @@ export class AIController {
   @Post('generate-tip')
   @ApiOperation({ summary: '生成今日AI健康建议' })
   async generateTip(@CurrentUser('userId') userId: string, @Body() dto: GenerateTipDto) {
+    const startTime = Date.now();
+    
     try {
       // 检查用户是否有自定义提示
       const hasCustomTips = await this.tipsService.hasCustomTips(userId);
@@ -135,11 +196,30 @@ export class AIController {
         { role: 'user', content: prompt },
       ]);
 
+      // 记录AI调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.TIP_GENERATION,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
       return {
         type: 'ai',
         content: aiResponse,
       };
     } catch (error) {
+      // 记录失败日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.TIP_GENERATION,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error.message,
+      });
+      
       // 返回默认建议，避免前端报错
       return {
         type: 'ai',
@@ -163,18 +243,41 @@ export class AIController {
     @CurrentUser('userId') userId: string,
     @Body() dto: GenerateMealPlanDto,
   ) {
-    // 直接使用 MealPlanService 生成食谱（内部会调用AI）
-    // 避免在这里调用 aiService，防止重复生成
-    const plan = await this.mealPlanService.generate(userId, {
-      calorieTarget: dto.calorieTarget || 2000,
-      mealCount: dto.mealCount || 3,
-      healthGoal: dto.healthGoal || '维持',
-      flavorPrefs: dto.flavorPrefs || [],
-      heightCm: dto.heightCm,
-      weightKg: dto.weightKg,
-    } as any);
+    const startTime = Date.now();
+    
+    try {
+      // 直接使用 MealPlanService 生成食谱（内部会调用AI）
+      const plan = await this.mealPlanService.generate(userId, {
+        calorieTarget: dto.calorieTarget || 2000,
+        mealCount: dto.mealCount || 3,
+        healthGoal: dto.healthGoal || '维持',
+        flavorPrefs: dto.flavorPrefs || [],
+        heightCm: dto.heightCm,
+        weightKg: dto.weightKg,
+      } as any);
 
-    return plan;
+      // 记录AI调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.MEAL_PLAN_GENERATION,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return plan;
+    } catch (error) {
+      // 记录失败日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.MEAL_PLAN_GENERATION,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error.message,
+      });
+      throw error;
+    }
   }
 
   @Post('chat')
@@ -183,34 +286,58 @@ export class AIController {
     @CurrentUser('userId') userId: string,
     @Body() dto: ChatDto,
   ) {
-    // 保存或获取会话
-    let sessionId = dto.sessionId;
-    if (!sessionId) {
-      const session = await this.chatService.createSession(userId, { title: dto.message.slice(0, 20) });
-      sessionId = session.id;
+    const startTime = Date.now();
+    
+    try {
+      // 保存或获取会话
+      let sessionId = dto.sessionId;
+      if (!sessionId) {
+        const session = await this.chatService.createSession(userId, { title: dto.message.slice(0, 20) });
+        sessionId = session.id;
+      }
+
+      // 保存用户消息
+      await this.chatService.saveMessage(sessionId, 'user', dto.message, userId);
+
+      // 获取历史消息
+      const history = await this.chatService.getMessages(sessionId);
+      const messages = history.map(h => ({ role: h.role, content: h.content }));
+
+      // 调用AI
+      const content = await this.aiService.chat(messages);
+
+      // 保存AI回复
+      await this.chatService.saveMessage(sessionId, 'assistant', content, userId);
+
+      // 更新会话消息数
+      await this.chatService.updateMessageCount(sessionId);
+
+      // 记录AI调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.CHAT,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return {
+        sessionId,
+        content,
+        messageCount: history.length + 1,
+      };
+    } catch (error) {
+      // 记录失败日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.CHAT,
+        provider: AIProvider.DASHSCOPE,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error.message,
+      });
+      throw error;
     }
-
-    // 保存用户消息
-    await this.chatService.saveMessage(sessionId, 'user', dto.message, userId);
-
-    // 获取历史消息
-    const history = await this.chatService.getMessages(sessionId);
-    const messages = history.map(h => ({ role: h.role, content: h.content }));
-
-    // 调用AI
-    const content = await this.aiService.chat(messages);
-
-    // 保存AI回复
-    await this.chatService.saveMessage(sessionId, 'assistant', content, userId);
-
-    // 更新会话消息数
-    await this.chatService.updateMessageCount(sessionId);
-
-    return {
-      sessionId,
-      content,
-      messageCount: history.length + 1,
-    };
   }
 
   @Get('chat/sessions')

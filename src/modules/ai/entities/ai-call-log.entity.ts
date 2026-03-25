@@ -2,6 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 
 
 export enum AIFunctionType {
   NUTRITION_ANALYSIS = 'nutrition_analysis',
+  VOICE_ANALYSIS = 'voice_analysis',
   CHAT = 'chat',
   MEAL_PLAN_GENERATION = 'meal_plan_generation',
   TIP_GENERATION = 'tip_generation',

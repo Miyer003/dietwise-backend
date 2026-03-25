@@ -11,17 +11,20 @@ export default registerAs('app', () => {
   
   // 后端服务绑定地址
   // - 生产环境: 0.0.0.0 (接受所有请求)
-  // - 开发环境 lan 模式: 0.0.0.0 (接受局域网请求)
-  // - 开发环境 local 模式: localhost (仅本机)
-  const serverHost = isProduction || devMode === 'lan' ? '0.0.0.0' : 'localhost';
+  // - 开发环境 (lan/hotspot/devbuild/expogo): 0.0.0.0 (接受局域网请求)
+  // - 开发环境 (local/usb/web): localhost (仅本机)
+  const serverHost = isProduction || 
+    (devMode && ['lan', 'hotspot', 'devbuild', 'expogo'].includes(devMode))
+    ? '0.0.0.0' 
+    : 'localhost';
   
   // MinIO 服务端点
   // - 生产环境: 使用配置的 MINIO_ENDPOINT (通常是域名)
-  // - 开发环境 lan 模式: 使用 DEV_HOST (电脑局域网IP)
-  // - 开发环境 local 模式: localhost
+  // - 开发环境 (lan/hotspot/devbuild/expogo): 使用 DEV_HOST (电脑局域网IP)
+  // - 开发环境 (local/usb/web): localhost
   const minioHost = isProduction 
     ? (process.env.MINIO_ENDPOINT || 'localhost')
-    : (devMode === 'lan' ? devHost : 'localhost');
+    : (devMode && ['lan', 'hotspot', 'devbuild', 'expogo'].includes(devMode) ? devHost : 'localhost');
   
   return {
     isProduction,

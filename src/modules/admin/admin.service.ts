@@ -31,11 +31,31 @@ export class AdminService {
 
   // ==================== Dashboard ====================
 
+  // 获取今天的开始和结束时间（UTC）
+  private getTodayRange() {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    return {
+      start: new Date(`${todayStr}T00:00:00.000Z`),
+      end: new Date(`${todayStr}T23:59:59.999Z`),
+    };
+  }
+
+  // 获取指定日期的开始和结束时间（UTC）
+  private getDateRange(daysAgo: number) {
+    const now = new Date();
+    const date = new Date(now);
+    date.setDate(date.getDate() - daysAgo);
+    const dateStr = date.toISOString().split('T')[0];
+    return {
+      start: new Date(`${dateStr}T00:00:00.000Z`),
+      end: new Date(`${dateStr}T23:59:59.999Z`),
+    };
+  }
+
   // 获取核心指标概览
   async getDashboardOverview() {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const { start, end } = this.getTodayRange();
 
     // 总用户数
     const totalUsers = await this.userRepo.count();
@@ -43,7 +63,7 @@ export class AdminService {
     // 今日新增用户
     const todayNewUsers = await this.userRepo.count({
       where: {
-        createdAt: Between(today, tomorrow),
+        createdAt: Between(start, end),
       },
     });
 
@@ -51,22 +71,22 @@ export class AdminService {
     const todayActiveUsersQuery = await this.dietRecordRepo
       .createQueryBuilder('record')
       .select('COUNT(DISTINCT record.user_id)', 'count')
-      .where('record.createdAt >= :today', { today })
-      .andWhere('record.createdAt < :tomorrow', { tomorrow })
+      .where('record.createdAt >= :start', { start })
+      .andWhere('record.createdAt <= :end', { end })
       .getRawOne();
     const todayActiveUsers = parseInt(todayActiveUsersQuery?.count || '0');
 
     // 今日记录数
     const todayRecords = await this.dietRecordRepo.count({
       where: {
-        createdAt: Between(today, tomorrow),
+        createdAt: Between(start, end),
       },
     });
 
     // 今日AI调用
     const todayAICalls = await this.aiLogRepo.count({
       where: {
-        createdAt: Between(today, tomorrow),
+        createdAt: Between(start, end),
       },
     });
 
@@ -74,8 +94,8 @@ export class AdminService {
     const aiCostResult = await this.aiLogRepo
       .createQueryBuilder('log')
       .select('SUM(log.costCents)', 'total')
-      .where('log.createdAt >= :today', { today })
-      .andWhere('log.createdAt < :tomorrow', { tomorrow })
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
       .getRawOne();
     const todayAICost = Math.round((parseFloat(aiCostResult?.total || '0')) / 100);
 
@@ -101,17 +121,15 @@ export class AdminService {
     const newUsers: number[] = [];
     const activeUsers: number[] = [];
 
-    const now = new Date();
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-      const dateStr = date.toISOString().split('T')[0];
+      const { start, end } = this.getDateRange(i);
+      const dateStr = start.toISOString().split('T')[0];
       dates.push(dateStr);
 
       // 新增用户
       const newCount = await this.userRepo.count({
         where: {
-          createdAt: Between(date, nextDate),
+          createdAt: Between(start, end),
         },
       });
       newUsers.push(newCount);
@@ -120,8 +138,8 @@ export class AdminService {
       const activeQuery = await this.dietRecordRepo
         .createQueryBuilder('record')
         .select('COUNT(DISTINCT record.user_id)', 'count')
-        .where('record.createdAt >= :date', { date })
-        .andWhere('record.createdAt < :nextDate', { nextDate })
+        .where('record.createdAt >= :start', { start })
+        .andWhere('record.createdAt <= :end', { end })
         .getRawOne();
       activeUsers.push(parseInt(activeQuery?.count || '0'));
     }
@@ -135,16 +153,14 @@ export class AdminService {
     const callCounts: number[] = [];
     const costs: number[] = [];
 
-    const now = new Date();
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-      const dateStr = date.toISOString().split('T')[0];
+      const { start, end } = this.getDateRange(i);
+      const dateStr = start.toISOString().split('T')[0];
       dates.push(dateStr);
 
       const callCount = await this.aiLogRepo.count({
         where: {
-          createdAt: Between(date, nextDate),
+          createdAt: Between(start, end),
         },
       });
       callCounts.push(callCount);
@@ -152,8 +168,8 @@ export class AdminService {
       const costResult = await this.aiLogRepo
         .createQueryBuilder('log')
         .select('SUM(log.costCents)', 'total')
-        .where('log.createdAt >= :date', { date })
-        .andWhere('log.createdAt < :nextDate', { nextDate })
+        .where('log.createdAt >= :start', { start })
+        .andWhere('log.createdAt <= :end', { end })
         .getRawOne();
       costs.push(Math.round((parseFloat(costResult?.total || '0')) / 100));
     }
@@ -252,11 +268,24 @@ export class AdminService {
     };
   }
 
+  // 更新用户状态
+  async updateUserStatus(id: string, dto: UpdateUserStatusDto) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    user.status = dto.status;
+    await this.userRepo.save(user);
+
+    return { success: true };
+  }
+
   // 获取用户饮食记录
   async getUserRecords(userId: string, page = 1, limit = 20) {
     const [records, total] = await this.dietRecordRepo.findAndCount({
       where: { userId },
-      order: { recordDate: 'DESC' },
+      order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -277,18 +306,6 @@ export class AdminService {
     });
   }
 
-  // 更新用户状态
-  async updateUserStatus(id: string, dto: UpdateUserStatusDto) {
-    const user = await this.userRepo.findOne({ where: { id } });
-
-    if (!user) {
-      throw new NotFoundException('用户不存在');
-    }
-
-    user.status = dto.status;
-    return this.userRepo.save(user);
-  }
-
   // ==================== 食物库管理 ====================
 
   // 获取食物列表
@@ -301,7 +318,7 @@ export class AdminService {
       where.category = category;
     }
 
-    const [items, total] = await this.foodRepo.findAndCount({
+    const [foods, total] = await this.foodRepo.findAndCount({
       where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
@@ -312,8 +329,18 @@ export class AdminService {
       total,
       page,
       limit,
-      items,
+      items: foods,
     };
+  }
+
+  // 获取食物分类
+  async getFoodCategories() {
+    const categories = await this.foodRepo
+      .createQueryBuilder('food')
+      .select('DISTINCT food.category', 'category')
+      .getRawMany();
+    
+    return categories.map(c => c.category);
   }
 
   // 获取食物详情
@@ -333,117 +360,97 @@ export class AdminService {
 
   // 更新食物
   async updateFood(id: string, data: Partial<FoodItem>) {
-    const food = await this.getFoodDetail(id);
+    const food = await this.foodRepo.findOne({ where: { id } });
+    if (!food) {
+      throw new NotFoundException('食物不存在');
+    }
     Object.assign(food, data);
     return this.foodRepo.save(food);
   }
 
   // 删除食物
   async deleteFood(id: string) {
-    const food = await this.getFoodDetail(id);
+    const food = await this.foodRepo.findOne({ where: { id } });
+    if (!food) {
+      throw new NotFoundException('食物不存在');
+    }
     await this.foodRepo.remove(food);
-  }
-
-  // 获取食物分类
-  async getFoodCategories() {
-    const categories = await this.foodRepo
-      .createQueryBuilder('food')
-      .select('DISTINCT food.category', 'category')
-      .getRawMany();
-    return categories.map(c => c.category);
+    return { success: true };
   }
 
   // ==================== AI监控 ====================
 
-  // AI统计
+  // 获取AI统计（按日期范围）
   async getAIStats(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    let dateFilter: any = {};
-    if (startDate && endDate) {
-      dateFilter = {
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      };
-    }
+    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
+    const end = endDate ? new Date(endDate) : new Date();
 
-    const totalCalls = await this.aiLogRepo.count({ where: dateFilter });
-    
-    const costResult = await this.aiLogRepo
+    const stats = await this.aiLogRepo
       .createQueryBuilder('log')
-      .select('SUM(log.costCents)', 'total')
-      .where(dateFilter)
-      .getRawOne();
-    
-    const totalCost = parseFloat(costResult?.total || '0') / 100;
+      .select('DATE(log.createdAt)', 'date')
+      .addSelect('COUNT(*)', 'calls')
+      .addSelect('SUM(log.costCents)', 'cost')
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
+      .groupBy('DATE(log.createdAt)')
+      .orderBy('date', 'DESC')
+      .getRawMany();
 
-    const successCalls = await this.aiLogRepo.count({
-      where: { ...dateFilter, success: true },
-    });
-
-    return {
-      totalCalls,
-      totalCost: Math.round(totalCost * 100) / 100,
-      successCalls,
-      failedCalls: totalCalls - successCalls,
-      successRate: totalCalls > 0 ? Math.round((successCalls / totalCalls) * 100) : 0,
-    };
+    return stats;
   }
 
-  // 按服务商统计
+  // 获取AI统计按服务商
   async getAIStatsByProvider(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    const queryBuilder = this.aiLogRepo
+    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
+    const end = endDate ? new Date(endDate) : new Date();
+
+    return this.aiLogRepo
       .createQueryBuilder('log')
       .select('log.provider', 'provider')
       .addSelect('COUNT(*)', 'calls')
       .addSelect('SUM(log.costCents)', 'cost')
-      .groupBy('log.provider');
-
-    if (startDate && endDate) {
-      queryBuilder.where('log.createdAt >= :startDate AND log.createdAt <= :endDate', {
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-      });
-    }
-
-    return queryBuilder.getRawMany();
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
+      .groupBy('log.provider')
+      .getRawMany();
   }
 
-  // 按功能统计
+  // 获取AI统计按功能
   async getAIStatsByFunction(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    const queryBuilder = this.aiLogRepo
+    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
+    const end = endDate ? new Date(endDate) : new Date();
+
+    return this.aiLogRepo
       .createQueryBuilder('log')
       .select('log.functionType', 'functionType')
       .addSelect('COUNT(*)', 'calls')
       .addSelect('SUM(log.costCents)', 'cost')
-      .groupBy('log.functionType');
-
-    if (startDate && endDate) {
-      queryBuilder.where('log.createdAt >= :startDate AND log.createdAt <= :endDate', {
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-      });
-    }
-
-    return queryBuilder.getRawMany();
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
+      .groupBy('log.functionType')
+      .getRawMany();
   }
 
-  // AI调用日志
-  async getAILogs(query: DateRangeQueryDto & { page?: number; limit?: number }) {
-    const { startDate, endDate, page = 1, limit = 20 } = query;
+  // 获取AI调用日志
+  async getAILogs(query: { page?: number; limit?: number; userId?: string; startDate?: string; endDate?: string }) {
+    const { page = 1, limit = 20, userId, startDate, endDate } = query;
     
-    let dateFilter: any = {};
+    const where: any = {};
+    if (userId) {
+      where.userId = userId;
+    }
     if (startDate && endDate) {
-      dateFilter = {
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      };
+      where.createdAt = Between(new Date(startDate), new Date(endDate));
     }
 
-    const [items, total] = await this.aiLogRepo.findAndCount({
-      where: dateFilter,
+    const [logs, total] = await this.aiLogRepo.findAndCount({
+      where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -453,7 +460,7 @@ export class AdminService {
       total,
       page,
       limit,
-      items,
+      items: logs,
     };
   }
 
@@ -466,18 +473,29 @@ export class AdminService {
       where.status = status;
     }
 
-    const [items, total] = await this.feedbackRepo.findAndCount({
+    const [feedbacks, total] = await this.feedbackRepo.findAndCount({
       where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
+      relations: ['user'],
     });
 
     return {
       total,
       page,
       limit,
-      items,
+      items: feedbacks.map(f => ({
+        id: f.id,
+        userId: f.userId,
+        content: f.content,
+        status: f.status,
+        createdAt: f.createdAt,
+        user: f.user ? {
+          nickname: f.user.nickname,
+          phone: f.user.phone,
+        } : null,
+      })),
     };
   }
 
@@ -485,25 +503,32 @@ export class AdminService {
   async getFeedbackDetail(id: string) {
     const feedback = await this.feedbackRepo.findOne({
       where: { id },
+      relations: ['user'],
     });
+    if (!feedback) {
+      throw new NotFoundException('反馈不存在');
+    }
+    return {
+      ...feedback,
+      user: feedback.user ? {
+        nickname: feedback.user.nickname,
+        phone: feedback.user.phone,
+      } : null,
+    };
+  }
 
+  // 更新反馈状态
+  async updateFeedback(id: string, dto: UpdateFeedbackDto) {
+    const feedback = await this.feedbackRepo.findOne({ where: { id } });
     if (!feedback) {
       throw new NotFoundException('反馈不存在');
     }
 
-    return feedback;
-  }
-
-  // 处理反馈
-  async updateFeedback(id: string, dto: UpdateFeedbackDto) {
-    const feedback = await this.getFeedbackDetail(id);
-    
     if (dto.adminReply !== undefined) {
       feedback.adminReply = dto.adminReply;
-      feedback.status = FeedbackStatus.RESOLVED;
-      feedback.resolvedAt = new Date();
     }
 
-    return this.feedbackRepo.save(feedback);
+    await this.feedbackRepo.save(feedback);
+    return { success: true };
   }
 }

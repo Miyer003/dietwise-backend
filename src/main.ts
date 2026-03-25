@@ -64,7 +64,7 @@ async function bootstrap() {
   await app.listen(port, host);
   
   // 根据模式显示不同的访问地址
-  if (devMode === 'lan') {
+  if (devMode === 'lan' || devMode === 'hotspot') {
     console.log(`🚀 服务启动 (局域网模式)`);
     console.log(`   本机访问: http://localhost:${port}`);
     console.log(`   局域网访问: http://${devHost}:${port}`);

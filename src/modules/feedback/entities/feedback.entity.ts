@@ -1,5 +1,6 @@
-import { Entity, Column, Index } from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
+import { User } from '../../user/entities/user.entity';
 
 export enum FeedbackType {
   BUG = 'bug',
@@ -21,6 +22,10 @@ export enum FeedbackStatus {
 export class Feedback extends BaseEntity {
   @Column({ type: 'uuid', name: 'user_id', nullable: true })
   userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 
   @Column({ type: 'enum', enum: FeedbackType })
   type: FeedbackType;
