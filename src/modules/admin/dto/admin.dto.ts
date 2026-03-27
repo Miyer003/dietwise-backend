@@ -74,6 +74,11 @@ export class UpdateFeedbackDto {
   @IsOptional()
   @IsString()
   adminReply?: string;
+
+  @ApiPropertyOptional({ description: '状态', enum: ['pending', 'processing', 'resolved', 'rejected'] })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
 
 export class CreateFoodDto {

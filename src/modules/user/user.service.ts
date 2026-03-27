@@ -135,7 +135,6 @@ export class UserService {
       profile.dailyCalorieGoal = this.calculateDailyCalorieGoal(profile);
     }
 
-    profile.updatedAt = new Date();
     return this.profileRepo.save(profile);
   }
 

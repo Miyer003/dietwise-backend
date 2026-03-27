@@ -37,7 +37,6 @@ export class NotificationService {
     }
 
     Object.assign(settings, dto);
-    settings.updatedAt = new Date();
 
     return this.settingRepo.save(settings);
   }
@@ -51,7 +50,6 @@ export class NotificationService {
     }
 
     settings.expoPushToken = token;
-    settings.updatedAt = new Date();
 
     return this.settingRepo.save(settings);
   }

@@ -10,6 +10,7 @@ import { AICallLog } from '../ai/entities/ai-call-log.entity';
 import { Feedback, FeedbackStatus } from '../feedback/entities/feedback.entity';
 import { UserAchievement } from '../achievement/entities/user-achievement.entity';
 import { UpdateUserStatusDto, UserListQueryDto, DateRangeQueryDto, UpdateFeedbackDto } from './dto/admin.dto';
+import { formatToBeijingTime } from '../../common/utils/time.util';
 
 @Injectable()
 export class AdminService {
@@ -226,8 +227,8 @@ export class AdminService {
         avatarEmoji: user.avatarEmoji,
         role: user.role,
         status: user.status,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt,
+        createdAt: formatToBeijingTime(user.createdAt),
+        lastLoginAt: formatToBeijingTime(user.lastLoginAt),
       })),
     };
   }
@@ -264,9 +265,13 @@ export class AdminService {
       avatarEmoji: user.avatarEmoji,
       role: user.role,
       status: user.status,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt,
-      profile: user.profile,
+      createdAt: formatToBeijingTime(user.createdAt),
+      lastLoginAt: formatToBeijingTime(user.lastLoginAt),
+      profile: user.profile ? {
+        ...user.profile,
+        birthDate: user.profile.birthDate,
+        updatedAt: formatToBeijingTime(user.profile.updatedAt),
+      } : null,
       stats: {
         totalRecords,
         totalAchievements,
@@ -514,27 +519,73 @@ export class AdminService {
     const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const limit = Math.min(daysDiff, 30);
 
+    // 使用 PostgreSQL 的时区转换函数获取北京时间日期
     const stats = await this.aiLogRepo
       .createQueryBuilder('log')
-      .select('DATE(log.createdAt)', 'date')
+      .select("TO_CHAR(log.createdAt AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')", 'date')
       .addSelect('COUNT(*)', 'calls')
       .addSelect('SUM(log.costCents)', 'cost')
       .addSelect('SUM(CASE WHEN log.success = true THEN 1 ELSE 0 END)', 'successCalls')
       .addSelect('SUM(CASE WHEN log.success = false THEN 1 ELSE 0 END)', 'failCalls')
+      .addSelect('AVG(log.latencyMs)', 'avgLatency')
       .where('log.createdAt >= :start', { start })
       .andWhere('log.createdAt <= :end', { end })
-      .groupBy('DATE(log.createdAt)')
+      .groupBy("TO_CHAR(log.createdAt AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')")
       .orderBy('date', 'ASC')
       .limit(limit)
       .getRawMany();
 
-    return stats.map(s => ({
+    // 填充缺失的日期
+    const result = this.fillMissingDates(stats, start, end, limit);
+    
+    return result.map(s => ({
       date: s.date,
-      calls: parseInt(s.calls),
-      cost: Math.round((parseFloat(s.cost || 0)) / 100),
-      successCalls: parseInt(s.successCalls),
-      failCalls: parseInt(s.failCalls),
+      calls: parseInt(s.calls) || 0,
+      cost: Math.round((parseFloat(s.cost || 0)) / 100 * 100) / 100, // 保留两位小数
+      successCalls: parseInt(s.successCalls) || 0,
+      failCalls: parseInt(s.failCalls) || 0,
+      successRate: parseInt(s.calls) > 0 
+        ? Math.round((parseInt(s.successCalls || 0) / parseInt(s.calls)) * 1000) / 10 
+        : 0,
+      avgLatency: Math.round(parseFloat(s.avgLatency || 0)),
     }));
+  }
+
+  // 填充缺失的日期数据
+  private fillMissingDates(stats: any[], start: Date, end: Date, limit: number): any[] {
+    // 生成日期范围映射
+    const dateMap = new Map<string, any>();
+    
+    // 初始化所有日期为 0
+    const current = new Date(start);
+    const endDate = new Date(end);
+    let count = 0;
+    
+    while (current <= endDate && count < limit) {
+      const dateStr = formatToBeijingTime(current, 'date');
+      dateMap.set(dateStr, {
+        date: dateStr,
+        calls: 0,
+        cost: 0,
+        successCalls: 0,
+        failCalls: 0,
+        avgLatency: 0,
+      });
+      current.setDate(current.getDate() + 1);
+      count++;
+    }
+    
+    // 填充实际数据
+    for (const stat of stats) {
+      if (dateMap.has(stat.date)) {
+        dateMap.set(stat.date, stat);
+      }
+    }
+    
+    // 按日期排序返回
+    return Array.from(dateMap.values()).sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
   }
 
   // 获取AI调用日志
@@ -559,11 +610,27 @@ export class AdminService {
       take: limit,
     });
 
+    // 转换时间为北京时间字符串
+    const items = logs.map(log => ({
+      id: log.id,
+      userId: log.userId,
+      functionType: log.functionType,
+      provider: log.provider,
+      modelName: log.modelName,
+      inputTokens: log.inputTokens,
+      outputTokens: log.outputTokens,
+      latencyMs: log.latencyMs,
+      costCents: log.costCents,
+      success: log.success,
+      errorMessage: log.errorMessage,
+      createdAt: formatToBeijingTime(log.createdAt),
+    }));
+
     return {
       total,
       page,
       limit,
-      items: logs,
+      items,
     };
   }
 
@@ -596,7 +663,8 @@ export class AdminService {
         contactInfo: f.contactInfo,
         status: f.status,
         adminReply: f.adminReply,
-        createdAt: f.createdAt,
+        createdAt: formatToBeijingTime(f.createdAt),
+        resolvedAt: formatToBeijingTime(f.resolvedAt),
         user: f.user ? {
           nickname: f.user.nickname,
           phone: f.user.phone,
@@ -616,6 +684,9 @@ export class AdminService {
     }
     return {
       ...feedback,
+      createdAt: formatToBeijingTime(feedback.createdAt),
+      updatedAt: formatToBeijingTime(feedback.updatedAt),
+      resolvedAt: formatToBeijingTime(feedback.resolvedAt),
       user: feedback.user ? {
         nickname: feedback.user.nickname,
         phone: feedback.user.phone,
@@ -624,7 +695,7 @@ export class AdminService {
   }
 
   // 更新反馈状态
-  async updateFeedback(id: string, dto: UpdateFeedbackDto) {
+  async updateFeedback(id: string, dto: UpdateFeedbackDto, adminId?: string) {
     const feedback = await this.feedbackRepo.findOne({ where: { id } });
     if (!feedback) {
       throw new NotFoundException('反馈不存在');
@@ -634,6 +705,17 @@ export class AdminService {
       feedback.adminReply = dto.adminReply;
     }
 
+    if (dto.status) {
+      feedback.status = dto.status as FeedbackStatus;
+      // 如果状态变为 resolved 或 rejected，自动设置处理时间和管理员
+      if (dto.status === 'resolved' || dto.status === 'rejected') {
+        feedback.resolvedAt = new Date();
+        if (adminId) {
+          feedback.adminId = adminId;
+        }
+      }
+    }
+
     await this.feedbackRepo.save(feedback);
     return { success: true };
   }
@@ -641,14 +723,27 @@ export class AdminService {
   // ==================== 按日期查询活跃用户 ====================
 
   async getActiveUsersByDate(date: string, page = 1, limit = 20) {
-    // 查询指定日期有饮食记录的用户，使用 record_date 字段
+    // 重要：record_date 在 PostgreSQL 中是 date 类型
+    // 存储的是北京时间日期（如 '2026-03-27'），PostgreSQL 驱动返回为 UTC 时间戳显示
+    // 查询时直接使用用户传入的日期字符串，不需要时区转换
+    const dateStr = date;  // 直接使用 YYYY-MM-DD 格式
+    
+    // 计算下一天，用于范围查询 [date, nextDate)
+    // 使用简单的字符串操作，避免时区问题
+    const [year, month, day] = date.split('-').map(Number);
+    const currentDate = new Date(Date.UTC(year, month - 1, day));
+    const nextDate = new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+    const nextDateStr = nextDate.toISOString().split('T')[0];
+
+    // 使用范围查询，避免时区问题
     const userRecords = await this.dietRecordRepo
       .createQueryBuilder('record')
       .select('record.user_id', 'userId')
       .addSelect('COUNT(record.id)', 'recordCount')
-      .where('record.record_date = :date', { date })
+      .where('record.record_date >= :dateStr::date', { dateStr })
+      .andWhere('record.record_date < :nextDateStr::date', { nextDateStr })
       .groupBy('record.user_id')
-      .orderBy('recordCount', 'DESC')
+      .orderBy('COUNT(record.id)', 'DESC')
       .getRawMany();
 
     const userIds = userRecords.map(r => r.userId);
@@ -670,15 +765,15 @@ export class AdminService {
     const recordCountMap = new Map(userRecords.map(r => [r.userId, parseInt(r.recordCount)]));
 
     // 按原来的顺序排列用户
-    const items = paginatedIds.map(userId => {
+    const items = paginatedIds.map((userId) => {
       const user = users.find(u => u.id === userId);
       return {
         id: user?.id || userId,
         phone: user?.phone || '-',
         nickname: user?.nickname || '未知用户',
         avatarEmoji: user?.avatarEmoji || '👤',
-        createdAt: user?.createdAt,
-        lastLoginAt: user?.lastLoginAt,
+        createdAt: formatToBeijingTime(user?.createdAt),
+        lastLoginAt: formatToBeijingTime(user?.lastLoginAt),
         todayRecords: recordCountMap.get(userId) || 0,
       };
     });
@@ -750,6 +845,9 @@ export class AdminService {
       const user = userMap.get(record.userId);
       return {
         ...record,
+        recordDate: formatToBeijingTime(record.recordDate, 'date'),
+        createdAt: formatToBeijingTime(record.createdAt),
+        updatedAt: formatToBeijingTime(record.updatedAt),
         userPhone: user?.phone,
         userNickname: user?.nickname,
         userAvatar: user?.avatarEmoji,

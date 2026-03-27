@@ -1,11 +1,9 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
+import { BaseEntity } from '../../../common/entities/base.entity';
 
 @Entity('badge_definitions')
 @Index(['category', 'isActive'])
-export class BadgeDefinition {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class BadgeDefinition extends BaseEntity {
   @Column({ type: 'varchar', length: 50, unique: true, name: 'badge_code' })
   badgeCode: string;
 
@@ -35,12 +33,6 @@ export class BadgeDefinition {
 
   @Column({ type: 'smallint', name: 'sort_order', default: 0 })
   sortOrder: number;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }
 
 // 默认徽章数据

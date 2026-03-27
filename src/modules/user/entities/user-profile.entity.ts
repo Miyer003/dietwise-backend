@@ -1,4 +1,5 @@
-import { Entity, Column, OneToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, OneToOne, JoinColumn, Index } from 'typeorm';
+import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from './user.entity';
 
 export enum Gender {
@@ -8,11 +9,9 @@ export enum Gender {
 }
 
 @Entity('user_profiles')
-export class UserProfile {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ type: 'uuid', name: 'user_id', unique: true })
+@Index(['userId'], { unique: true })
+export class UserProfile extends BaseEntity {
+  @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
   @OneToOne(() => User, user => user.profile)
@@ -63,7 +62,4 @@ export class UserProfile {
 
   @Column({ type: 'varchar', length: 200, nullable: true })
   bio: string;
-
-  @Column({ type: 'timestamptz', name: 'updated_at', default: () => 'CURRENT_TIMESTAMP' })
-  updatedAt: Date;
 }

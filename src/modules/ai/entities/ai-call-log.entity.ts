@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
+import { BaseEntity } from '../../../common/entities/base.entity';
 
 export enum AIFunctionType {
   NUTRITION_ANALYSIS = 'nutrition_analysis',
@@ -14,10 +15,7 @@ export enum AIProvider {
 }
 
 @Entity('ai_call_logs')
-export class AICallLog {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class AICallLog extends BaseEntity {
   @Column({ name: 'user_id' })
   @Index()
   userId: string;
@@ -57,7 +55,4 @@ export class AICallLog {
 
   @Column({ name: 'error_message', nullable: true, type: 'text' })
   errorMessage: string;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
 }

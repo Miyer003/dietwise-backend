@@ -1,8 +1,10 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
+import { BaseEntity } from '../../../common/entities/base.entity';
 
 @Entity('notification_settings')
-export class NotificationSetting {
-  @PrimaryColumn({ type: 'uuid', name: 'user_id' })
+@Index(['userId'], { unique: true })
+export class NotificationSetting extends BaseEntity {
+  @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
   @Column({ type: 'boolean', name: 'master_enabled', default: true })
@@ -53,7 +55,4 @@ export class NotificationSetting {
   // Expo推送Token
   @Column({ type: 'text', name: 'expo_push_token', nullable: true })
   expoPushToken: string;
-
-  @Column({ type: 'timestamptz', name: 'updated_at', default: () => 'CURRENT_TIMESTAMP' })
-  updatedAt: Date;
 }

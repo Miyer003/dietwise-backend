@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Patch, Query, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Query, Param, Body, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -44,6 +45,27 @@ export class AdminController {
   @ApiOperation({ summary: '用户列表' })
   async getUsers(@Query() query: UserListQueryDto) {
     return this.adminService.getUsers(query);
+  }
+
+  // 注意：这个路由必须放在 /users/:id 之前，否则会被 NestJS 路由顺序问题拦截
+  @Get('users/active-by-date')
+  @ApiOperation({ summary: '按日期查询活跃用户' })
+  @ApiQuery({ name: 'date', required: true, example: '2026-03-27' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  async getActiveUsersByDate(
+    @Query('date') date: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    try {
+      return await this.adminService.getActiveUsersByDate(date, page || 1, limit || 20);
+    } catch (error) {
+      throw new HttpException(
+        `查询活跃用户失败: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get('users/:id')
@@ -173,21 +195,6 @@ export class AdminController {
     return this.adminService.getAILogs({ ...query, page: page || 1, limit: limit || 20 });
   }
 
-  // ==================== 按日期查询活跃用户 ====================
-  
-  @Get('users/active-by-date')
-  @ApiOperation({ summary: '按日期查询活跃用户' })
-  @ApiQuery({ name: 'date', required: true, example: '2026-03-27' })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  async getActiveUsersByDate(
-    @Query('date') date: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.adminService.getActiveUsersByDate(date, page || 1, limit || 20);
-  }
-
   // ==================== 饮食记录管理 ====================
 
   @Get('records')
@@ -267,7 +274,8 @@ export class AdminController {
   async updateFeedback(
     @Param('id') id: string,
     @Body() dto: UpdateFeedbackDto,
+    @CurrentUser('userId') adminId: string,
   ) {
-    return this.adminService.updateFeedback(id, dto);
+    return this.adminService.updateFeedback(id, dto, adminId);
   }
 }
