@@ -38,6 +38,10 @@ export class AIController {
       // 图片分析（支持 URL 或 Base64）
       if (dto.type === 'image') {
         let result;
+        let modelName = 'qwen-vl-plus';
+        let inputTokens = 0;
+        let outputTokens = 0;
+        
         if (dto.imageBase64) {
           result = await this.aiService.analyzeNutritionByBase64(dto.imageBase64);
         } else if (dto.imageUrl) {
@@ -46,12 +50,19 @@ export class AIController {
           return { error: '请提供图片 URL 或 Base64 数据' };
         }
         
+        // 如果返回结果包含 Token 使用量
+        if (result.model) modelName = result.model;
+        if (result.inputTokens) inputTokens = result.inputTokens;
+        if (result.outputTokens) outputTokens = result.outputTokens;
+        
         // 记录AI调用日志
         await this.aiLogService.createLog({
           userId,
           functionType: AIFunctionType.NUTRITION_ANALYSIS,
           provider: AIProvider.DASHSCOPE,
-          modelName: 'qwen-vl-plus',
+          modelName,
+          inputTokens,
+          outputTokens,
           latencyMs: Date.now() - startTime,
           success: true,
         });
@@ -69,12 +80,14 @@ export class AIController {
       
       const result = await this.aiService.analyzeNutritionByText(dto.description, dto.quantityG);
       
-      // 记录AI调用日志
+      // 记录AI调用日志（包含 Token 使用量）
       await this.aiLogService.createLog({
         userId,
         functionType: AIFunctionType.NUTRITION_ANALYSIS,
         provider: AIProvider.DASHSCOPE,
-        modelName: 'qwen-turbo',
+        modelName: result.model || 'qwen-turbo',
+        inputTokens: result.inputTokens || 0,
+        outputTokens: result.outputTokens || 0,
         latencyMs: Date.now() - startTime,
         success: true,
       });
@@ -103,13 +116,27 @@ export class AIController {
     const startTime = Date.now();
     
     try {
-      // 1. 尝试语音识别
-      let transcribedText = await this.aiService.speechToText(
+      // 1. 语音识别（qwen-omni-turbo 或 paraformer）
+      const speechStartTime = Date.now();
+      const speechResult = await this.aiService.speechToText(
         dto.audioBase64, 
         dto.mimeType
       );
+      
+      // 记录语音识别 AI 调用日志
+      await this.aiLogService.createLog({
+        userId,
+        functionType: AIFunctionType.VOICE_ANALYSIS,
+        provider: AIProvider.DASHSCOPE,
+        modelName: speechResult.model || 'qwen-omni-turbo',
+        inputTokens: speechResult.inputTokens || 0,
+        outputTokens: speechResult.outputTokens || 0,
+        latencyMs: Date.now() - speechStartTime,
+        success: !!speechResult.text,
+      });
 
       // 2. 如果语音识别失败，使用智能猜测
+      let transcribedText = speechResult.text;
       let analysisResult: any;
       let isGuessed = false;
       
@@ -130,20 +157,24 @@ export class AIController {
         analysisResult.isGuessed = true;
       } else {
         // 3. 正常营养分析
+        const analysisStartTime = Date.now();
         analysisResult = await this.aiService.analyzeNutritionByText(
           transcribedText, 
           undefined
         );
+        
+        // 记录营养分析 AI 调用日志
+        await this.aiLogService.createLog({
+          userId,
+          functionType: AIFunctionType.NUTRITION_ANALYSIS,
+          provider: AIProvider.DASHSCOPE,
+          modelName: analysisResult.model || 'qwen-turbo',
+          inputTokens: analysisResult.inputTokens || 0,
+          outputTokens: analysisResult.outputTokens || 0,
+          latencyMs: Date.now() - analysisStartTime,
+          success: true,
+        });
       }
-
-      // 记录AI调用日志
-      await this.aiLogService.createLog({
-        userId,
-        functionType: AIFunctionType.VOICE_ANALYSIS,
-        provider: AIProvider.DASHSCOPE,
-        latencyMs: Date.now() - startTime,
-        success: true,
-      });
 
       return {
         transcribedText,
@@ -156,6 +187,7 @@ export class AIController {
         userId,
         functionType: AIFunctionType.VOICE_ANALYSIS,
         provider: AIProvider.DASHSCOPE,
+        modelName: 'qwen-omni-turbo+qwen-turbo',
         latencyMs: Date.now() - startTime,
         success: false,
         errorMessage: error.message,
@@ -192,22 +224,25 @@ export class AIController {
       const profile = await this.userService.getProfile(userId).catch(() => null);
 
       const prompt = this.buildTipPrompt(summary, profile);
-      const aiResponse = await this.aiService.chat([
+      const aiResult = await this.aiService.chatWithTokens([
         { role: 'user', content: prompt },
       ]);
 
-      // 记录AI调用日志
+      // 记录AI调用日志（包含模型和Token）
       await this.aiLogService.createLog({
         userId,
         functionType: AIFunctionType.TIP_GENERATION,
         provider: AIProvider.DASHSCOPE,
+        modelName: aiResult.model || 'qwen-turbo',
+        inputTokens: aiResult.inputTokens || 0,
+        outputTokens: aiResult.outputTokens || 0,
         latencyMs: Date.now() - startTime,
         success: true,
       });
 
       return {
         type: 'ai',
-        content: aiResponse,
+        content: aiResult.content,
       };
     } catch (error) {
       // 记录失败日志
@@ -303,27 +338,30 @@ export class AIController {
       const history = await this.chatService.getMessages(sessionId);
       const messages = history.map(h => ({ role: h.role, content: h.content }));
 
-      // 调用AI
-      const content = await this.aiService.chat(messages);
+      // 调用AI（获取完整结果包含Token信息）
+      const aiResult = await this.aiService.chatWithTokens(messages);
 
       // 保存AI回复
-      await this.chatService.saveMessage(sessionId, 'assistant', content, userId);
+      await this.chatService.saveMessage(sessionId, 'assistant', aiResult.content, userId);
 
       // 更新会话消息数
       await this.chatService.updateMessageCount(sessionId);
 
-      // 记录AI调用日志
+      // 记录AI调用日志（包含模型和Token）
       await this.aiLogService.createLog({
         userId,
         functionType: AIFunctionType.CHAT,
         provider: AIProvider.DASHSCOPE,
+        modelName: aiResult.model || 'qwen-turbo',
+        inputTokens: aiResult.inputTokens || 0,
+        outputTokens: aiResult.outputTokens || 0,
         latencyMs: Date.now() - startTime,
         success: true,
       });
 
       return {
         sessionId,
-        content,
+        content: aiResult.content,
         messageCount: history.length + 1,
       };
     } catch (error) {

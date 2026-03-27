@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DashscopeService } from './dashscope.service';
 import { MoonshotService } from './moonshot.service';
-import { NutritionAnalysisResult, ChatMessage } from './interfaces/ai.interface';
+import { NutritionAnalysisResult, NutritionAnalysisResultWithTokens, ChatMessage, AICompletionResult, SpeechToTextResult } from './interfaces/ai.interface';
 
 @Injectable()
 export class AIService {
@@ -13,7 +13,7 @@ export class AIService {
   ) {}
 
   // 营养分析：优先使用 Dashscope VL 模型（图片 URL）
-  async analyzeNutrition(imageUrl: string): Promise<NutritionAnalysisResult> {
+  async analyzeNutrition(imageUrl: string): Promise<NutritionAnalysisResultWithTokens> {
     try {
       return await this.dashscope.analyzeNutritionByImage(imageUrl);
     } catch (error) {
@@ -29,12 +29,15 @@ export class AIService {
         fiberG: 0,
         sodiumMg: 0,
         confidence: 0.5,
+        model: 'qwen-vl-plus',
+        inputTokens: 0,
+        outputTokens: 0,
       };
     }
   }
 
   // 营养分析：使用 Base64 图片
-  async analyzeNutritionByBase64(base64Image: string): Promise<NutritionAnalysisResult> {
+  async analyzeNutritionByBase64(base64Image: string): Promise<NutritionAnalysisResultWithTokens> {
     try {
       return await this.dashscope.analyzeNutritionByBase64(base64Image);
     } catch (error) {
@@ -50,12 +53,15 @@ export class AIService {
         fiberG: 0,
         sodiumMg: 0,
         confidence: 0.5,
+        model: 'qwen-vl-plus',
+        inputTokens: 0,
+        outputTokens: 0,
       };
     }
   }
 
   // 营养分析：通过文字描述
-  async analyzeNutritionByText(description: string, quantityG?: number): Promise<NutritionAnalysisResult> {
+  async analyzeNutritionByText(description: string, quantityG?: number): Promise<NutritionAnalysisResult & { model?: string; inputTokens?: number; outputTokens?: number }> {
     const prompt = `请分析以下食物的营养成分：
 
 食物描述：${description}
@@ -75,23 +81,26 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
 }`;
 
     try {
-      const response = await this.dashscope.chatCompletion([
+      const result = await this.dashscope.chatCompletion([
         { role: 'user', content: prompt }
       ]);
 
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
         return {
-          foodName: result.foodName || description.slice(0, 20),
-          quantityG: parseFloat(result.quantityG) || quantityG || 100,
-          calories: parseFloat(result.calories) || 0,
-          proteinG: parseFloat(result.proteinG) || 0,
-          carbsG: parseFloat(result.carbsG) || 0,
-          fatG: parseFloat(result.fatG) || 0,
-          fiberG: parseFloat(result.fiberG) || 0,
-          sodiumMg: parseFloat(result.sodiumMg) || 0,
-          confidence: parseFloat(result.confidence) || 0.8,
+          foodName: parsed.foodName || description.slice(0, 20),
+          quantityG: parseFloat(parsed.quantityG) || quantityG || 100,
+          calories: parseFloat(parsed.calories) || 0,
+          proteinG: parseFloat(parsed.proteinG) || 0,
+          carbsG: parseFloat(parsed.carbsG) || 0,
+          fatG: parseFloat(parsed.fatG) || 0,
+          fiberG: parseFloat(parsed.fiberG) || 0,
+          sodiumMg: parseFloat(parsed.sodiumMg) || 0,
+          confidence: parseFloat(parsed.confidence) || 0.8,
+          model: result.model,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
         };
       }
       throw new Error('无法解析AI返回内容');
@@ -126,9 +135,9 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
         },
         { role: 'user', content: prompt }
       ]);
-      if (result && result.length > 50) {
+      if (result.content && result.content.length > 50) {
         this.logger.log('Dashscope (Qwen) 生成食谱成功');
-        return result;
+        return result.content;
       }
       throw new Error('Dashscope 返回内容太短');
     } catch (dashscopeError) {
@@ -154,7 +163,8 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
   // 简单聊天：使用 Dashscope turbo（更快更便宜）
   async chat(messages: ChatMessage[]): Promise<string> {
     try {
-      return await this.dashscope.chatCompletion(messages);
+      const result = await this.dashscope.chatCompletion(messages);
+      return result.content;
     } catch (error) {
       this.logger.error('AI 聊天失败:', error.message);
       // 返回友好的错误提示
@@ -162,14 +172,35 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     }
   }
 
+  // 聊天并返回完整信息（包含Token使用量）
+  async chatWithTokens(messages: ChatMessage[]): Promise<AICompletionResult> {
+    try {
+      return await this.dashscope.chatCompletion(messages);
+    } catch (error) {
+      this.logger.error('AI 聊天失败:', error.message);
+      // 返回默认值
+      return {
+        content: '抱歉，AI 服务暂时不可用，请稍后再试。',
+        model: 'qwen-turbo',
+        inputTokens: 0,
+        outputTokens: 0,
+      };
+    }
+  }
+
   // 语音识别：将音频转为文字
-  async speechToText(audioBase64: string, mimeType?: string): Promise<string> {
+  async speechToText(audioBase64: string, mimeType?: string): Promise<SpeechToTextResult> {
     try {
       return await this.dashscope.speechToText(audioBase64, mimeType);
     } catch (error) {
       this.logger.error('语音识别失败:', error.message);
-      // 返回空字符串，让上层处理
-      return '';
+      // 返回空结果，让上层处理
+      return {
+        text: '',
+        model: 'qwen-omni-turbo',
+        inputTokens: 0,
+        outputTokens: 0,
+      };
     }
   }
 
@@ -198,17 +229,17 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
 {"foodName": "食物名称", "quantityG": 份量克数, "confidence": 0.8}`;
 
     try {
-      const response = await this.dashscope.chatCompletion([
+      const result = await this.dashscope.chatCompletion([
         { role: 'user', content: prompt }
       ]);
 
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
         return {
-          foodName: result.foodName || '未知食物',
-          quantityG: parseInt(result.quantityG) || 200,
-          confidence: parseFloat(result.confidence) || 0.6,
+          foodName: parsed.foodName || '未知食物',
+          quantityG: parseInt(parsed.quantityG) || 200,
+          confidence: parseFloat(parsed.confidence) || 0.6,
         };
       }
     } catch (error) {
@@ -236,11 +267,11 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
     
     try {
       // 使用 Dashscope 非流式接口，然后模拟流式输出
-      const response = await this.dashscope.chatCompletion(messages);
-      fullContent = response;
+      const result = await this.dashscope.chatCompletion(messages);
+      fullContent = result.content;
       
       // 模拟流式输出（按字符分批发送）
-      const chunks = response.split('');
+      const chunks = result.content.split('');
       for (const chunk of chunks) {
         callbacks.onDelta(chunk);
         // 添加小延迟模拟打字效果

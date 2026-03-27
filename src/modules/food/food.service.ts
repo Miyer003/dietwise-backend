@@ -32,6 +32,33 @@ export class FoodService {
     private readonly recordItemRepo: Repository<DietRecordItem>,
   ) {}
 
+  // 按分类获取食物列表
+  async findByCategory(category?: string, limit: number = 50) {
+    const query = this.foodRepo.createQueryBuilder('food');
+
+    if (category) {
+      query.where('food.category = :category', { category });
+    }
+
+    const items = await query
+      .orderBy('food.isVerified', 'DESC')
+      .addOrderBy('food.name')
+      .limit(limit)
+      .getMany();
+
+    return items.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      caloriesPer100g: item.caloriesPer100g,
+      proteinPer100g: item.proteinPer100g,
+      carbsPer100g: item.carbsPer100g,
+      fatPer100g: item.fatPer100g,
+      fiberPer100g: item.fiberPer100g,
+      defaultPortionG: item.defaultPortionG,
+    }));
+  }
+
   // 搜索食物（中文+拼音模糊搜索）
   async search(keyword: string, category?: string, limit: number = 20) {
     const query = this.foodRepo.createQueryBuilder('food')

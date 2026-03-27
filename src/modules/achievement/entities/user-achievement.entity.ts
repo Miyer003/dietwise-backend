@@ -23,6 +23,15 @@ export class UserAchievement extends BaseEntity {
   @Column({ type: 'varchar', length: 7, name: 'icon_color', default: '#F59E0B' })
   iconColor: string;
 
+  @Column({ type: 'varchar', length: 20, name: 'category', default: 'habit' })
+  category: string; // continuous(连续) / balanced(均衡) / habit(习惯)
+
+  @Column({ type: 'varchar', length: 30, name: 'condition_type', default: 'default' })
+  conditionType: string; // streak_days / balanced_days / photo_count / etc
+
+  @Column({ type: 'integer', name: 'condition_value', default: 1 })
+  conditionValue: number;
+
   @Column({ type: 'timestamptz', name: 'unlocked_at' })
   unlockedAt: Date;
 

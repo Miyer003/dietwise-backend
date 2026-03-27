@@ -9,7 +9,6 @@ export class CreateFeedbackDto {
 
   @ApiProperty({ description: '反馈内容', example: '发现拍照识别不准确' })
   @IsString()
-  @Length(10, 2000)
   content: string;
 
   @ApiProperty({ description: '联系方式', example: 'user@example.com', required: false })

@@ -11,6 +11,17 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class FoodController {
   constructor(private readonly foodService: FoodService) {}
 
+  @Get()
+  @ApiOperation({ summary: '获取食物列表（支持分类筛选）' })
+  @ApiQuery({ name: 'category', description: '分类过滤', required: false })
+  @ApiQuery({ name: 'limit', description: '数量限制', required: false })
+  async getFoods(
+    @Query('category') category?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.foodService.findByCategory(category, limit || 50);
+  }
+
   @Get('search')
   @ApiOperation({ summary: '搜索食物（支持中文+拼音模糊搜索）' })
   @ApiQuery({ name: 'q', description: '关键词', required: true })

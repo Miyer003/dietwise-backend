@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { NutritionAnalysisResult } from './interfaces/ai.interface';
+import { NutritionAnalysisResult, AICompletionResult, NutritionAnalysisResultWithTokens, SpeechToTextResult } from './interfaces/ai.interface';
 
 @Injectable()
 export class DashscopeService {
@@ -23,13 +23,14 @@ export class DashscopeService {
     }
   }
 
-  async analyzeNutritionByImage(imageUrl: string): Promise<NutritionAnalysisResult> {
+  async analyzeNutritionByImage(imageUrl: string): Promise<NutritionAnalysisResultWithTokens> {
     try {
+      const model = this.config.get('app.ai.dashscope.vlModel') || 'qwen-vl-plus';
       const response = await lastValueFrom(
         this.http.post(
           `${this.baseUrl}/chat/completions`,
           {
-            model: this.config.get('app.ai.dashscope.vlModel') || 'qwen-vl-plus',
+            model,
             messages: [
               {
                 role: 'user',
@@ -49,8 +50,14 @@ export class DashscopeService {
         ),
       );
 
+      const data = (response as any).data;
       // 解析 VL 模型返回的文本内容
-      const content = (response as any).data?.choices?.[0]?.message?.content || '';
+      const content = data?.choices?.[0]?.message?.content || '';
+      // 获取 Token 使用量
+      const usage = data?.usage || {};
+      const inputTokens = usage?.prompt_tokens || usage?.input_tokens || 0;
+      const outputTokens = usage?.completion_tokens || usage?.output_tokens || 0;
+      
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
@@ -64,6 +71,9 @@ export class DashscopeService {
           fiberG: parseFloat(result.fiberG) || 0,
           sodiumMg: parseFloat(result.sodiumMg) || 0,
           confidence: 0.9,
+          model,
+          inputTokens,
+          outputTokens,
         };
       }
       throw new Error('无法解析 AI 返回内容');
@@ -79,8 +89,9 @@ export class DashscopeService {
     }
   }
 
-  async analyzeNutritionByBase64(base64Image: string): Promise<NutritionAnalysisResult> {
+  async analyzeNutritionByBase64(base64Image: string): Promise<NutritionAnalysisResultWithTokens> {
     try {
+      const model = this.config.get('app.ai.dashscope.vlModel') || 'qwen-vl-plus';
       // 构建 data URL
       const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
       
@@ -88,7 +99,7 @@ export class DashscopeService {
         this.http.post(
           `${this.baseUrl}/chat/completions`,
           {
-            model: this.config.get('app.ai.dashscope.vlModel') || 'qwen-vl-plus',
+            model,
             messages: [
               {
                 role: 'user',
@@ -108,8 +119,14 @@ export class DashscopeService {
         ),
       );
 
+      const data = (response as any).data;
       // 解析 VL 模型返回的文本内容
-      const content = (response as any).data?.choices?.[0]?.message?.content || '';
+      const content = data?.choices?.[0]?.message?.content || '';
+      // 获取 Token 使用量
+      const usage = data?.usage || {};
+      const inputTokens = usage?.prompt_tokens || usage?.input_tokens || 0;
+      const outputTokens = usage?.completion_tokens || usage?.output_tokens || 0;
+      
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
@@ -123,6 +140,9 @@ export class DashscopeService {
           fiberG: parseFloat(result.fiberG) || 0,
           sodiumMg: parseFloat(result.sodiumMg) || 0,
           confidence: 0.9,
+          model,
+          inputTokens,
+          outputTokens,
         };
       }
       throw new Error('无法解析 AI 返回内容');
@@ -138,7 +158,7 @@ export class DashscopeService {
     }
   }
 
-  async chatCompletion(messages: any[]): Promise<string> {
+  async chatCompletion(messages: any[]): Promise<AICompletionResult> {
     try {
       // 转换消息格式以兼容 OpenAI 格式
       const formattedMessages = messages.map(msg => ({
@@ -146,11 +166,12 @@ export class DashscopeService {
         content: msg.content,
       }));
 
+      const model = this.config.get('app.ai.dashscope.textModel') || 'qwen-turbo';
       const response = await lastValueFrom(
         this.http.post(
           `${this.baseUrl}/chat/completions`,
           {
-            model: this.config.get('app.ai.dashscope.textModel') || 'qwen-turbo',
+            model,
             messages: formattedMessages,
           },
           {
@@ -161,7 +182,19 @@ export class DashscopeService {
           },
         ),
       );
-      return (response as any).data?.choices?.[0]?.message?.content || '';
+      
+      const data = (response as any).data;
+      const content = data?.choices?.[0]?.message?.content || '';
+      const usage = data?.usage || {};
+      const inputTokens = usage?.prompt_tokens || usage?.input_tokens || 0;
+      const outputTokens = usage?.completion_tokens || usage?.output_tokens || 0;
+      
+      return {
+        content,
+        model,
+        inputTokens,
+        outputTokens,
+      };
     } catch (error: any) {
       this.logger.error(`AI 对话失败: ${error.message}`);
       if (error.response?.status === 401) {
@@ -175,7 +208,7 @@ export class DashscopeService {
   }
 
   // 语音识别：使用 qwen-omni-turbo 全模态模型（Dashscope 原生 API）
-  async speechToText(audioBase64: string, mimeType?: string): Promise<string> {
+  async speechToText(audioBase64: string, mimeType?: string): Promise<SpeechToTextResult> {
     try {
       this.logger.log(`开始语音识别，mimeType: ${mimeType}, 音频长度: ${audioBase64.length}`);
       
@@ -216,8 +249,14 @@ export class DashscopeService {
         ),
       );
 
+      const responseData = (response as any).data;
       // 解析响应
-      const choices = (response as any).data?.output?.choices;
+      const choices = responseData?.output?.choices;
+      // 获取 Token 使用量
+      const usage = responseData?.usage || {};
+      const inputTokens = usage?.input_tokens || 0;
+      const outputTokens = usage?.output_tokens || 0;
+      
       if (choices && choices.length > 0) {
         const content = choices[0].message?.content;
         let text = '';
@@ -231,7 +270,7 @@ export class DashscopeService {
           text = content;
         }
         
-        this.logger.log(`语音识别成功: ${text}`);
+        this.logger.log(`语音识别成功: ${text}, tokens: ${inputTokens}/${outputTokens}`);
         
         // 清理返回的内容（去除可能的描述性文字）
         text = text.trim()
@@ -239,7 +278,12 @@ export class DashscopeService {
           .replace(/['"]$/g, '')
           .replace(/^["']|["']$/g, '');
         
-        return text;
+        return {
+          text,
+          model: audioModel,
+          inputTokens,
+          outputTokens,
+        };
       }
       
       throw new Error('语音识别返回空结果');
@@ -255,7 +299,7 @@ export class DashscopeService {
   }
 
   // 备选语音识别：使用 Paraformer 专用语音模型
-  private async fallbackSpeechToText(audioBase64: string, mimeType?: string): Promise<string> {
+  private async fallbackSpeechToText(audioBase64: string, mimeType?: string): Promise<SpeechToTextResult> {
     try {
       this.logger.log('使用备选方案：Paraformer 语音识别');
       
@@ -285,16 +329,32 @@ export class DashscopeService {
         ),
       );
 
-      const result = (response as any).data?.output?.text || '';
+      const responseData = (response as any).data;
+      const result = responseData?.output?.text || '';
+      // Paraformer 返回的 usage 格式不同
+      const usage = responseData?.usage || {};
+      const inputTokens = usage?.input_tokens || 0;
+      const outputTokens = usage?.output_tokens || 0;
+      
       if (result) {
         this.logger.log(`备选语音识别成功: ${result}`);
-        return result.trim();
+        return {
+          text: result.trim(),
+          model: 'paraformer-v2',
+          inputTokens,
+          outputTokens,
+        };
       }
       throw new Error('备选语音识别返回空结果');
     } catch (error: any) {
       this.logger.error(`备选语音识别也失败: ${error.message}`);
-      // 返回空字符串，让上层触发智能猜测
-      return '';
+      // 返回空结果，让上层触发智能猜测
+      return {
+        text: '',
+        model: 'paraformer-v2',
+        inputTokens: 0,
+        outputTokens: 0,
+      };
     }
   }
 }

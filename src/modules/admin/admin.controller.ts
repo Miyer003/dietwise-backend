@@ -147,6 +147,18 @@ export class AdminController {
     return this.adminService.getAIStatsByFunction(query);
   }
 
+  @Get('ai-monitor/models')
+  @ApiOperation({ summary: '按模型统计' })
+  async getAIStatsByModel(@Query() query: DateRangeQueryDto) {
+    return this.adminService.getAIStatsByModel(query);
+  }
+
+  @Get('ai-monitor/trend')
+  @ApiOperation({ summary: 'AI调用趋势（按日期）' })
+  async getAIMonitorTrend(@Query() query: DateRangeQueryDto) {
+    return this.adminService.getAIUsageTrendForMonitor(query);
+  }
+
   @Get('ai-monitor/logs')
   @ApiOperation({ summary: 'AI调用日志' })
   @ApiQuery({ name: 'startDate', required: false })
@@ -159,6 +171,74 @@ export class AdminController {
     @Query('limit') limit?: number,
   ) {
     return this.adminService.getAILogs({ ...query, page: page || 1, limit: limit || 20 });
+  }
+
+  // ==================== 按日期查询活跃用户 ====================
+  
+  @Get('users/active-by-date')
+  @ApiOperation({ summary: '按日期查询活跃用户' })
+  @ApiQuery({ name: 'date', required: true, example: '2026-03-27' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  async getActiveUsersByDate(
+    @Query('date') date: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getActiveUsersByDate(date, page || 1, limit || 20);
+  }
+
+  // ==================== 饮食记录管理 ====================
+
+  @Get('records')
+  @ApiOperation({ summary: '饮食记录列表' })
+  @ApiQuery({ name: 'userKeyword', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'mealType', required: false })
+  @ApiQuery({ name: 'inputMethod', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  async getRecords(
+    @Query('userKeyword') userKeyword?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('mealType') mealType?: string,
+    @Query('inputMethod') inputMethod?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getRecords({
+      userKeyword,
+      startDate,
+      endDate,
+      mealType,
+      inputMethod,
+      page: page || 1,
+      limit: limit || 20,
+    });
+  }
+
+  @Get('records/stats')
+  @ApiOperation({ summary: '饮食记录统计' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'mealType', required: false })
+  @ApiQuery({ name: 'inputMethod', required: false })
+  async getRecordStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('mealType') mealType?: string,
+    @Query('inputMethod') inputMethod?: string,
+  ) {
+    return this.adminService.getRecordStats({ startDate, endDate, mealType, inputMethod });
+  }
+
+  @Delete('records/:id')
+  @ApiOperation({ summary: '删除饮食记录' })
+  async deleteRecord(@Param('id') id: string) {
+    await this.adminService.deleteRecord(id);
+    return { success: true };
   }
 
   // ==================== 反馈管理 ====================

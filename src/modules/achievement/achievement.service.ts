@@ -1,13 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserAchievement, BADGE_DEFINITIONS } from './entities/user-achievement.entity';
+import { UserAchievement } from './entities/user-achievement.entity';
+import { BadgeDefinition } from '../badge/entities/badge-definition.entity';
 
 @Injectable()
 export class AchievementService {
   constructor(
     @InjectRepository(UserAchievement)
     private readonly achievementRepo: Repository<UserAchievement>,
+    @InjectRepository(BadgeDefinition)
+    private readonly badgeRepo: Repository<BadgeDefinition>,
   ) {}
 
   // 获取所有成就
@@ -17,17 +20,29 @@ export class AchievementService {
       order: { unlockedAt: 'DESC' },
     });
 
+    // 获取所有徽章定义用于补充旧数据
+    const badgeDefs = await this.badgeRepo.find();
+    const badgeDefMap = new Map(badgeDefs.map(b => [b.badgeCode, b]));
+
     return {
       total: achievements.length,
-      achievements: achievements.map(a => ({
-        badgeCode: a.badgeCode,
-        badgeName: a.badgeName,
-        badgeDesc: a.badgeDesc,
-        iconEmoji: a.iconEmoji,
-        iconColor: a.iconColor,
-        unlockedAt: a.unlockedAt,
-        isNew: a.isNew,
-      })),
+      achievements: achievements.map(a => {
+        // 旧数据可能没有 category/conditionType，从 BadgeDefinition 补充
+        const badgeDef = badgeDefMap.get(a.badgeCode);
+        return {
+          badgeCode: a.badgeCode,
+          badgeName: a.badgeName,
+          badgeDesc: a.badgeDesc,
+          iconEmoji: a.iconEmoji,
+          iconColor: a.iconColor,
+          // 优先使用记录中的值，如果为默认值则从 BadgeDefinition 获取
+          category: (a.category && a.category !== 'habit') ? a.category : (badgeDef?.category || 'habit'),
+          conditionType: (a.conditionType && a.conditionType !== 'default') ? a.conditionType : (badgeDef?.conditionType || 'default'),
+          conditionValue: a.conditionValue || badgeDef?.conditionValue || 1,
+          unlockedAt: a.unlockedAt,
+          isNew: a.isNew,
+        };
+      }),
     };
   }
 
@@ -38,16 +53,26 @@ export class AchievementService {
       order: { unlockedAt: 'DESC' },
     });
 
+    // 获取所有徽章定义用于补充旧数据
+    const badgeDefs = await this.badgeRepo.find();
+    const badgeDefMap = new Map(badgeDefs.map(b => [b.badgeCode, b]));
+
     return {
       count: achievements.length,
-      achievements: achievements.map(a => ({
-        badgeCode: a.badgeCode,
-        badgeName: a.badgeName,
-        badgeDesc: a.badgeDesc,
-        iconEmoji: a.iconEmoji,
-        iconColor: a.iconColor,
-        unlockedAt: a.unlockedAt,
-      })),
+      achievements: achievements.map(a => {
+        const badgeDef = badgeDefMap.get(a.badgeCode);
+        return {
+          badgeCode: a.badgeCode,
+          badgeName: a.badgeName,
+          badgeDesc: a.badgeDesc,
+          iconEmoji: a.iconEmoji,
+          iconColor: a.iconColor,
+          category: (a.category && a.category !== 'habit') ? a.category : (badgeDef?.category || 'habit'),
+          conditionType: (a.conditionType && a.conditionType !== 'default') ? a.conditionType : (badgeDef?.conditionType || 'default'),
+          conditionValue: a.conditionValue || badgeDef?.conditionValue || 1,
+          unlockedAt: a.unlockedAt,
+        };
+      }),
     };
   }
 
@@ -59,8 +84,8 @@ export class AchievementService {
     );
   }
 
-  // 解锁成就
-  async unlock(userId: string, badgeCode: keyof typeof BADGE_DEFINITIONS) {
+  // 解锁成就 - 从数据库获取完整徽章定义
+  async unlock(userId: string, badgeCode: string) {
     const existing = await this.achievementRepo.findOne({
       where: { userId, badgeCode },
     });
@@ -69,18 +94,25 @@ export class AchievementService {
       return existing; // 已解锁过
     }
 
-    const badgeDef = BADGE_DEFINITIONS[badgeCode];
+    // 从数据库获取徽章定义
+    const badgeDef = await this.badgeRepo.findOne({
+      where: { badgeCode, isActive: true },
+    });
+    
     if (!badgeDef) {
       throw new Error(`未知的徽章代码: ${badgeCode}`);
     }
 
     const achievement = this.achievementRepo.create({
       userId,
-      badgeCode,
-      badgeName: badgeDef.name,
-      badgeDesc: badgeDef.desc,
-      iconEmoji: badgeDef.icon,
-      iconColor: badgeDef.color,
+      badgeCode: badgeDef.badgeCode,
+      badgeName: badgeDef.badgeName,
+      badgeDesc: badgeDef.badgeDesc,
+      iconEmoji: badgeDef.iconEmoji,
+      iconColor: badgeDef.iconColor,
+      category: badgeDef.category,
+      conditionType: badgeDef.conditionType,
+      conditionValue: badgeDef.conditionValue,
       unlockedAt: new Date(),
       isNew: true,
     });

@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, MoreThanOrEqual } from 'typeorm';
+import { Repository, Like, Between, MoreThanOrEqual, In } from 'typeorm';
 import { User, UserStatus } from '../user/entities/user.entity';
 import { UserProfile } from '../user/entities/user-profile.entity';
-import { DietRecord } from '../diet/entities/diet-record.entity';
+import { DietRecord, InputMethod } from '../diet/entities/diet-record.entity';
+import { DietRecordItem } from '../diet/entities/diet-record-item.entity';
 import { FoodItem } from '../food/entities/food-item.entity';
 import { AICallLog } from '../ai/entities/ai-call-log.entity';
 import { Feedback, FeedbackStatus } from '../feedback/entities/feedback.entity';
@@ -19,6 +20,8 @@ export class AdminService {
     private readonly profileRepo: Repository<UserProfile>,
     @InjectRepository(DietRecord)
     private readonly dietRecordRepo: Repository<DietRecord>,
+    @InjectRepository(DietRecordItem)
+    private readonly dietRecordItemRepo: Repository<DietRecordItem>,
     @InjectRepository(FoodItem)
     private readonly foodRepo: Repository<FoodItem>,
     @InjectRepository(AICallLog)
@@ -31,25 +34,29 @@ export class AdminService {
 
   // ==================== Dashboard ====================
 
-  // 获取今天的开始和结束时间（UTC）
+  // 获取今天的开始和结束时间（东八区 - 北京时间）
   private getTodayRange() {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // 转换为北京时间（UTC+8）
+    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const todayStr = beijingTime.toISOString().split('T')[0]; // YYYY-MM-DD
     return {
-      start: new Date(`${todayStr}T00:00:00.000Z`),
-      end: new Date(`${todayStr}T23:59:59.999Z`),
+      start: new Date(`${todayStr}T00:00:00.000+08:00`),
+      end: new Date(`${todayStr}T23:59:59.999+08:00`),
     };
   }
 
-  // 获取指定日期的开始和结束时间（UTC）
+  // 获取指定日期的开始和结束时间（东八区）
   private getDateRange(daysAgo: number) {
     const now = new Date();
-    const date = new Date(now);
+    // 转换为北京时间
+    const beijingNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const date = new Date(beijingNow);
     date.setDate(date.getDate() - daysAgo);
     const dateStr = date.toISOString().split('T')[0];
     return {
-      start: new Date(`${dateStr}T00:00:00.000Z`),
-      end: new Date(`${dateStr}T23:59:59.999Z`),
+      start: new Date(`${dateStr}T00:00:00.000+08:00`),
+      end: new Date(`${dateStr}T23:59:59.999+08:00`),
     };
   }
 
@@ -380,33 +387,56 @@ export class AdminService {
 
   // ==================== AI监控 ====================
 
-  // 获取AI统计（按日期范围）
+  // 获取AI统计概览（汇总数据）
   async getAIStats(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
-    const end = endDate ? new Date(endDate) : new Date();
+    // 将日期字符串解析为北京时间范围
+    const start = startDate 
+      ? new Date(`${startDate}T00:00:00.000+08:00`) 
+      : this.getDateRange(30).start;
+    const end = endDate 
+      ? new Date(`${endDate}T23:59:59.999+08:00`) 
+      : new Date();
 
-    const stats = await this.aiLogRepo
+    const result = await this.aiLogRepo
       .createQueryBuilder('log')
-      .select('DATE(log.createdAt)', 'date')
-      .addSelect('COUNT(*)', 'calls')
-      .addSelect('SUM(log.costCents)', 'cost')
+      .select('COUNT(*)', 'totalCalls')
+      .addSelect('SUM(log.costCents)', 'totalCost')
+      .addSelect('SUM(CASE WHEN log.success = true THEN 1 ELSE 0 END)', 'successCalls')
+      .addSelect('SUM(CASE WHEN log.success = false THEN 1 ELSE 0 END)', 'failedCalls')
+      .addSelect('AVG(log.latencyMs)', 'avgLatency')
       .where('log.createdAt >= :start', { start })
       .andWhere('log.createdAt <= :end', { end })
-      .groupBy('DATE(log.createdAt)')
-      .orderBy('date', 'DESC')
-      .getRawMany();
+      .getRawOne();
 
-    return stats;
+    const totalCalls = parseInt(result?.totalCalls || '0');
+    const successCalls = parseInt(result?.successCalls || '0');
+    const failedCalls = parseInt(result?.failedCalls || '0');
+    const totalCost = Math.round((parseFloat(result?.totalCost || '0')) / 100 * 100) / 100; // 转为元
+    const avgLatency = Math.round(parseFloat(result?.avgLatency || '0'));
+    const successRate = totalCalls > 0 ? Math.round((successCalls / totalCalls) * 1000) / 10 : 0;
+
+    return {
+      totalCalls,
+      totalCost,
+      successCalls,
+      failedCalls,
+      successRate,
+      avgLatency,
+    };
   }
 
   // 获取AI统计按服务商
   async getAIStatsByProvider(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
-    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate 
+      ? new Date(`${startDate}T00:00:00.000+08:00`) 
+      : this.getDateRange(30).start;
+    const end = endDate 
+      ? new Date(`${endDate}T23:59:59.999+08:00`) 
+      : new Date();
 
     return this.aiLogRepo
       .createQueryBuilder('log')
@@ -423,8 +453,12 @@ export class AdminService {
   async getAIStatsByFunction(query: DateRangeQueryDto) {
     const { startDate, endDate } = query;
     
-    const start = startDate ? new Date(startDate) : this.getDateRange(30).start;
-    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate 
+      ? new Date(`${startDate}T00:00:00.000+08:00`) 
+      : this.getDateRange(30).start;
+    const end = endDate 
+      ? new Date(`${endDate}T23:59:59.999+08:00`) 
+      : new Date();
 
     return this.aiLogRepo
       .createQueryBuilder('log')
@@ -437,6 +471,72 @@ export class AdminService {
       .getRawMany();
   }
 
+  // 获取AI统计按模型
+  async getAIStatsByModel(query: DateRangeQueryDto) {
+    const { startDate, endDate } = query;
+    
+    const start = startDate 
+      ? new Date(`${startDate}T00:00:00.000+08:00`) 
+      : this.getDateRange(30).start;
+    const end = endDate 
+      ? new Date(`${endDate}T23:59:59.999+08:00`) 
+      : new Date();
+
+    return this.aiLogRepo
+      .createQueryBuilder('log')
+      .select('log.modelName', 'modelName')
+      .addSelect('log.provider', 'provider')
+      .addSelect('COUNT(*)', 'calls')
+      .addSelect('SUM(log.costCents)', 'cost')
+      .addSelect('SUM(log.inputTokens)', 'inputTokens')
+      .addSelect('SUM(log.outputTokens)', 'outputTokens')
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
+      .andWhere('log.modelName IS NOT NULL')
+      .groupBy('log.modelName')
+      .addGroupBy('log.provider')
+      .orderBy('calls', 'DESC')
+      .getRawMany();
+  }
+
+  // 获取AI调用趋势（供监控页面使用）
+  async getAIUsageTrendForMonitor(query: DateRangeQueryDto) {
+    const { startDate, endDate } = query;
+    
+    const start = startDate 
+      ? new Date(`${startDate}T00:00:00.000+08:00`) 
+      : this.getDateRange(30).start;
+    const end = endDate 
+      ? new Date(`${endDate}T23:59:59.999+08:00`) 
+      : new Date();
+
+    // 计算日期差
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const limit = Math.min(daysDiff, 30);
+
+    const stats = await this.aiLogRepo
+      .createQueryBuilder('log')
+      .select('DATE(log.createdAt)', 'date')
+      .addSelect('COUNT(*)', 'calls')
+      .addSelect('SUM(log.costCents)', 'cost')
+      .addSelect('SUM(CASE WHEN log.success = true THEN 1 ELSE 0 END)', 'successCalls')
+      .addSelect('SUM(CASE WHEN log.success = false THEN 1 ELSE 0 END)', 'failCalls')
+      .where('log.createdAt >= :start', { start })
+      .andWhere('log.createdAt <= :end', { end })
+      .groupBy('DATE(log.createdAt)')
+      .orderBy('date', 'ASC')
+      .limit(limit)
+      .getRawMany();
+
+    return stats.map(s => ({
+      date: s.date,
+      calls: parseInt(s.calls),
+      cost: Math.round((parseFloat(s.cost || 0)) / 100),
+      successCalls: parseInt(s.successCalls),
+      failCalls: parseInt(s.failCalls),
+    }));
+  }
+
   // 获取AI调用日志
   async getAILogs(query: { page?: number; limit?: number; userId?: string; startDate?: string; endDate?: string }) {
     const { page = 1, limit = 20, userId, startDate, endDate } = query;
@@ -446,7 +546,10 @@ export class AdminService {
       where.userId = userId;
     }
     if (startDate && endDate) {
-      where.createdAt = Between(new Date(startDate), new Date(endDate));
+      // 将日期字符串解析为北京时间范围
+      const start = new Date(`${startDate}T00:00:00.000+08:00`);
+      const end = new Date(`${endDate}T23:59:59.999+08:00`);
+      where.createdAt = Between(start, end);
     }
 
     const [logs, total] = await this.aiLogRepo.findAndCount({
@@ -488,8 +591,11 @@ export class AdminService {
       items: feedbacks.map(f => ({
         id: f.id,
         userId: f.userId,
+        type: f.type,
         content: f.content,
+        contactInfo: f.contactInfo,
         status: f.status,
+        adminReply: f.adminReply,
         createdAt: f.createdAt,
         user: f.user ? {
           nickname: f.user.nickname,
@@ -529,6 +635,195 @@ export class AdminService {
     }
 
     await this.feedbackRepo.save(feedback);
+    return { success: true };
+  }
+
+  // ==================== 按日期查询活跃用户 ====================
+
+  async getActiveUsersByDate(date: string, page = 1, limit = 20) {
+    // 查询指定日期有饮食记录的用户，使用 record_date 字段
+    const userRecords = await this.dietRecordRepo
+      .createQueryBuilder('record')
+      .select('record.user_id', 'userId')
+      .addSelect('COUNT(record.id)', 'recordCount')
+      .where('record.record_date = :date', { date })
+      .groupBy('record.user_id')
+      .orderBy('recordCount', 'DESC')
+      .getRawMany();
+
+    const userIds = userRecords.map(r => r.userId);
+    const total = userIds.length;
+
+    if (total === 0) {
+      return { total: 0, page, limit, items: [] };
+    }
+
+    // 分页查询用户详情
+    const paginatedIds = userIds.slice((page - 1) * limit, page * limit);
+    
+    const users = await this.userRepo.find({
+      where: { id: In(paginatedIds) },
+      select: ['id', 'phone', 'nickname', 'avatarEmoji', 'createdAt', 'lastLoginAt'],
+    });
+
+    // 构建用户ID到记录数的映射
+    const recordCountMap = new Map(userRecords.map(r => [r.userId, parseInt(r.recordCount)]));
+
+    // 按原来的顺序排列用户
+    const items = paginatedIds.map(userId => {
+      const user = users.find(u => u.id === userId);
+      return {
+        id: user?.id || userId,
+        phone: user?.phone || '-',
+        nickname: user?.nickname || '未知用户',
+        avatarEmoji: user?.avatarEmoji || '👤',
+        createdAt: user?.createdAt,
+        lastLoginAt: user?.lastLoginAt,
+        todayRecords: recordCountMap.get(userId) || 0,
+      };
+    });
+
+    return { total, page, limit, items };
+  }
+
+  // ==================== 饮食记录管理 ====================
+
+  async getRecords(query: {
+    userKeyword?: string;
+    startDate?: string;
+    endDate?: string;
+    mealType?: string;
+    inputMethod?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { userKeyword, startDate, endDate, mealType, inputMethod, page = 1, limit = 20 } = query;
+
+    // 先查询用户条件
+    let userIds: string[] | undefined;
+    if (userKeyword) {
+      const users = await this.userRepo.find({
+        where: [
+          { phone: Like(`%${userKeyword}%`) },
+          { nickname: Like(`%${userKeyword}%`) },
+        ],
+        select: ['id'],
+      });
+      userIds = users.map(u => u.id);
+      if (userIds.length === 0) {
+        return { total: 0, page, limit, items: [] };
+      }
+    }
+
+    // 构建查询条件
+    const where: any = {};
+    if (userIds) {
+      where.userId = In(userIds);
+    }
+    if (startDate && endDate) {
+      where.recordDate = Between(startDate, endDate);
+    }
+    if (mealType) {
+      where.mealType = mealType;
+    }
+    if (inputMethod) {
+      where.inputMethod = inputMethod;
+    }
+
+    const [records, total] = await this.dietRecordRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+      relations: ['items'],
+    });
+
+    // 获取用户信息
+    const recordUserIds = [...new Set(records.map(r => r.userId))];
+    const users = await this.userRepo.find({
+      where: { id: In(recordUserIds) },
+      select: ['id', 'phone', 'nickname', 'avatarEmoji'],
+    });
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const items = records.map(record => {
+      const user = userMap.get(record.userId);
+      return {
+        ...record,
+        userPhone: user?.phone,
+        userNickname: user?.nickname,
+        userAvatar: user?.avatarEmoji,
+      };
+    });
+
+    return { total, page, limit, items };
+  }
+
+  async getRecordStats(query?: { startDate?: string; endDate?: string; mealType?: string; inputMethod?: string }) {
+    const startDate = query?.startDate || new Date().toISOString().split('T')[0];
+    const endDate = query?.endDate || startDate;
+
+    // 使用 QueryBuilder 统一查询
+    const qb = this.dietRecordRepo.createQueryBuilder('record');
+    
+    // 基础条件：record_date 范围
+    qb.where('record.record_date >= :startDate', { startDate })
+      .andWhere('record.record_date <= :endDate', { endDate });
+    
+    // 餐次条件
+    if (query?.mealType) {
+      qb.andWhere('record.meal_type = :mealType', { mealType: query.mealType });
+    }
+    
+    // 录入方式条件
+    if (query?.inputMethod) {
+      qb.andWhere('record.input_method = :inputMethod', { inputMethod: query.inputMethod });
+    }
+
+    // 复制查询条件用于不同统计
+    const baseQb = qb.clone();
+
+    // 记录总数
+    const totalResult = await baseQb.clone().select('COUNT(*)', 'count').getRawOne();
+    const total = parseInt(totalResult?.count || '0');
+
+    // 总热量
+    const caloriesResult = await baseQb.clone()
+      .select('SUM(record.total_calories)', 'total')
+      .getRawOne();
+    const totalCalories = Math.round(parseFloat(caloriesResult?.total || '0'));
+
+    // 拍照识别数量
+    const photoQb = qb.clone().andWhere('record.input_method = :photo', { photo: 'photo' });
+    const photoResult = await photoQb.select('COUNT(*)', 'count').getRawOne();
+    const photoCount = parseInt(photoResult?.count || '0');
+
+    // 语音/手动输入数量
+    const manualQb = qb.clone().andWhere('record.input_method IN (:...manualMethods)', { 
+      manualMethods: ['voice', 'manual'] 
+    });
+    const manualResult = await manualQb.select('COUNT(*)', 'count').getRawOne();
+    const manualCount = parseInt(manualResult?.count || '0');
+
+    return { total, totalCalories, photoCount, manualCount };
+  }
+
+  async deleteRecord(id: string) {
+    const record = await this.dietRecordRepo.findOne({ 
+      where: { id },
+      relations: ['items'],
+    });
+    if (!record) {
+      throw new NotFoundException('记录不存在');
+    }
+
+    // 删除记录项
+    if (record.items && record.items.length > 0) {
+      await this.dietRecordItemRepo.remove(record.items);
+    }
+
+    // 删除记录
+    await this.dietRecordRepo.remove(record);
     return { success: true };
   }
 }

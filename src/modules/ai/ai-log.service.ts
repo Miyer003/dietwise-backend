@@ -57,10 +57,13 @@ export class AILogService {
     return this.logRepo.save(log);
   }
 
-  // 获取用户当月使用统计
+  // 获取用户当月使用统计（使用东八区时间）
   async getMonthlyStats(userId: string, yearMonth?: string) {
-    const targetMonth = yearMonth || new Date().toISOString().slice(0, 7);
-    const startDate = new Date(`${targetMonth}-01`);
+    const now = new Date();
+    // 转换为北京时间
+    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const targetMonth = yearMonth || beijingTime.toISOString().slice(0, 7);
+    const startDate = new Date(`${targetMonth}-01T00:00:00.000+08:00`);
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
 

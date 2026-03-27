@@ -86,7 +86,8 @@ export class CreateDietRecordDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => DietRecordItemDto)
-  items: DietRecordItemDto[];
+  @IsOptional()
+  items?: DietRecordItemDto[];
 }
 
 export class UpdateDietRecordDto {
