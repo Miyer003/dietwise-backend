@@ -141,7 +141,7 @@ export class MealPlanService {
       mealCount: dto.mealCount || profile.mealCount || 3,
       flavorPrefs: dto.flavorPrefs || profile.flavorPrefs || [],
       allergyTags: profile.allergyTags || [],
-      age: this.calculateAge(profile.birthDate),
+      age: this.calculateAge(profile.birthDate) ?? 25,
       gender: profile.gender,
       // 高级设置
       restrictions: (dto as any).restrictions || [],
@@ -553,8 +553,8 @@ export class MealPlanService {
   }
 
   // 计算年龄
-  private calculateAge(birthDate: Date): number {
-    if (!birthDate) return undefined as any;
+  private calculateAge(birthDate: Date): number | null {
+    if (!birthDate) return null;
     const today = new Date();
     let age = today.getFullYear() - new Date(birthDate).getFullYear();
     const monthDiff = today.getMonth() - new Date(birthDate).getMonth();

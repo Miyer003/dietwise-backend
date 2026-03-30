@@ -127,7 +127,10 @@ export class UserService {
 
     // 重新计算BMR（如果提供了身高体重年龄性别）
     if (dto.heightCm || dto.weightKg || dto.gender || dto.birthDate) {
-      profile.bmr = this.calculateBMR(profile);
+      const bmr = this.calculateBMR(profile);
+      if (bmr !== null) {
+        profile.bmr = bmr;
+      }
     }
 
     // 如果设置了每日热量目标，使用用户设置；否则基于BMR自动计算
@@ -147,13 +150,13 @@ export class UserService {
   }
 
   // 计算BMR（基础代谢率）- Mifflin-St Jeor公式
-  private calculateBMR(profile: UserProfile): number {
+  private calculateBMR(profile: UserProfile): number | null {
     if (!profile.weightKg || !profile.heightCm || !profile.gender) {
-      return undefined as any;
+      return null;
     }
 
     const age = this.calculateAge(profile.birthDate);
-    if (!age) return undefined as any;
+    if (age === null) return null;
 
     let bmr: number;
     if (profile.gender === 'male') {
@@ -191,8 +194,8 @@ export class UserService {
   }
 
   // 计算年龄
-  private calculateAge(birthDate: Date): number {
-    if (!birthDate) return undefined as any;
+  private calculateAge(birthDate: Date): number | null {
+    if (!birthDate) return null;
     const today = new Date();
     let age = today.getFullYear() - new Date(birthDate).getFullYear();
     const monthDiff = today.getMonth() - new Date(birthDate).getMonth();
