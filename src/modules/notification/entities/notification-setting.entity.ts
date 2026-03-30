@@ -54,5 +54,5 @@ export class NotificationSetting extends BaseEntity {
 
   // Expo推送Token
   @Column({ type: 'text', name: 'expo_push_token', nullable: true })
-  expoPushToken: string;
+  expoPushToken: string | null;
 }

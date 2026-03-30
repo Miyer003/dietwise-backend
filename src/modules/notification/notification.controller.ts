@@ -1,6 +1,7 @@
 import { Controller, Get, Put, Patch, Body, UseGuards, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
+import { PushNotificationService } from './push-notification.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UpdateNotificationSettingsDto, PushTokenDto } from './dto/notification.dto';
@@ -10,7 +11,10 @@ import { UpdateNotificationSettingsDto, PushTokenDto } from './dto/notification.
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly pushNotificationService: PushNotificationService,
+  ) {}
 
   @Get('settings')
   @ApiOperation({ summary: '获取提醒设置' })
@@ -44,5 +48,11 @@ export class NotificationController {
   ) {
     await this.notificationService.savePushToken(userId, dto.expoPushToken);
     return { message: 'Token已注册' };
+  }
+
+  @Post('test')
+  @ApiOperation({ summary: '发送测试推送通知' })
+  async sendTestNotification(@CurrentUser('userId') userId: string) {
+    return this.pushNotificationService.sendTestNotification(userId);
   }
 }

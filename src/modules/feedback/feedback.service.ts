@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Feedback, FeedbackStatus } from './entities/feedback.entity';
 import { CreateFeedbackDto, UpdateFeedbackStatusDto } from './dto/feedback.dto';
+import { formatToBeijingTime } from '../../common/utils/time.util';
 
 @Injectable()
 export class FeedbackService {
@@ -35,9 +36,11 @@ export class FeedbackService {
       id: f.id,
       type: f.type,
       content: f.content,
+      contactInfo: f.contactInfo,
       status: f.status,
       adminReply: f.adminReply,
-      createdAt: f.createdAt,
+      createdAt: formatToBeijingTime(f.createdAt),
+      resolvedAt: formatToBeijingTime(f.resolvedAt),
     }));
   }
 
