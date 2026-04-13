@@ -45,7 +45,9 @@ export class MealPlanController {
   @Post('generate')
   @ApiOperation({ summary: 'AI生成食谱' })
   async generate(@CurrentUser('userId') userId: string, @Body() dto: GenerateMealPlanDto) {
-    return this.mealPlanService.generate(userId, dto);
+    const result = await this.mealPlanService.generate(userId, dto);
+    const { aiMeta, ...plan } = result as any;
+    return plan;
   }
 
   @Patch(':id')

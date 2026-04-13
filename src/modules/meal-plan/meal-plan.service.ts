@@ -153,7 +153,7 @@ export class MealPlanService {
     const aiResult = await this.aiService.generateMealPlan(userProfile, customRequest);
 
     // 解析AI返回的食谱数据
-    const parsedPlan = this.parseAIResponse(aiResult);
+    const parsedPlan = this.parseAIResponse(aiResult.content);
 
 
     // 创建食谱记录
@@ -194,7 +194,15 @@ export class MealPlanService {
       flavorPrefs: userProfile.flavorPrefs,
     });
 
-    return this.getById(userId, saved.id);
+    const planResult = await this.getById(userId, saved.id);
+    return {
+      ...planResult,
+      aiMeta: {
+        model: aiResult.model,
+        inputTokens: aiResult.inputTokens,
+        outputTokens: aiResult.outputTokens,
+      },
+    };
   }
 
   // 更新食谱（支持部分更新）

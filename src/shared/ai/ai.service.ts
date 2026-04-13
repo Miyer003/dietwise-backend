@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DashscopeService } from './dashscope.service';
 import { MoonshotService } from './moonshot.service';
 import { NutritionAnalysisResult, NutritionAnalysisResultWithTokens, ChatMessage, AICompletionResult, SpeechToTextResult } from './interfaces/ai.interface';
@@ -10,6 +11,7 @@ export class AIService {
   constructor(
     private readonly dashscope: DashscopeService,
     private readonly moonshot: MoonshotService,
+    private readonly config: ConfigService,
   ) {}
 
   // 营养分析：优先使用 Dashscope VL 模型（图片 URL）
@@ -122,7 +124,7 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
   }
 
   // 生成食谱：优先使用 Dashscope (Qwen)，失败时使用 Moonshot (Kimi)
-  async generateMealPlan(userProfile: any, customRequest?: string): Promise<string> {
+  async generateMealPlan(userProfile: any, customRequest?: string): Promise<AICompletionResult> {
     const prompt = this.buildMealPlanPrompt(userProfile, customRequest);
     
     // 先尝试 Dashscope (Qwen)
@@ -137,7 +139,7 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
       ]);
       if (result.content && result.content.length > 50) {
         this.logger.log('Dashscope (Qwen) 生成食谱成功');
-        return result.content;
+        return result;
       }
       throw new Error('Dashscope 返回内容太短');
     } catch (dashscopeError) {
@@ -146,16 +148,26 @@ ${quantityG ? `份量：${quantityG}克` : '份量请根据描述合理估算'}
       // 降级到 Moonshot (Kimi)
       try {
         this.logger.log('尝试使用 Moonshot (Kimi) 生成食谱...');
-        const result = await this.moonshot.generateMealPlan(prompt);
-        if (result && result.length > 50) {
+        const moonshotResult = await this.moonshot.generateMealPlan(prompt);
+        if (moonshotResult && moonshotResult.length > 50) {
           this.logger.log('Moonshot (Kimi) 生成食谱成功');
-          return result;
+          return {
+            content: moonshotResult,
+            model: this.config.get('app.ai.moonshot.model') || 'moonshot-v1-8k',
+            inputTokens: 0,
+            outputTokens: 0,
+          };
         }
         throw new Error('Moonshot 返回内容太短');
       } catch (moonshotError) {
         this.logger.error(`Moonshot (Kimi) 也失败: ${moonshotError.message}`);
         // 返回默认食谱模板
-        return this.getDefaultMealPlan(userProfile);
+        return {
+          content: this.getDefaultMealPlan(userProfile),
+          model: 'fallback',
+          inputTokens: 0,
+          outputTokens: 0,
+        };
       }
     }
   }

@@ -291,16 +291,21 @@ export class AIController {
         weightKg: dto.weightKg,
       } as any);
 
-      // 记录AI调用日志
+      // 记录AI调用日志（包含Token使用量）
       await this.aiLogService.createLog({
         userId,
         functionType: AIFunctionType.MEAL_PLAN_GENERATION,
         provider: AIProvider.DASHSCOPE,
+        modelName: plan.aiMeta?.model,
+        inputTokens: plan.aiMeta?.inputTokens,
+        outputTokens: plan.aiMeta?.outputTokens,
         latencyMs: Date.now() - startTime,
         success: true,
       });
 
-      return plan;
+      // 返回给前端时去掉 aiMeta
+      const { aiMeta, ...result } = plan;
+      return result;
     } catch (error) {
       // 记录失败日志
       await this.aiLogService.createLog({

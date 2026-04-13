@@ -21,7 +21,7 @@ export class AchievementService {
     });
 
     // 获取所有徽章定义用于补充旧数据
-    const badgeDefs = await this.badgeRepo.find();
+    const badgeDefs = await this.badgeRepo.find({ where: { isActive: true } });
     const badgeDefMap = new Map(badgeDefs.map(b => [b.badgeCode, b]));
 
     return {
@@ -43,6 +43,16 @@ export class AchievementService {
           isNew: a.isNew,
         };
       }),
+      badgeDefinitions: badgeDefs.map(b => ({
+        badgeCode: b.badgeCode,
+        badgeName: b.badgeName,
+        badgeDesc: b.badgeDesc,
+        iconEmoji: b.iconEmoji,
+        iconColor: b.iconColor,
+        category: b.category,
+        conditionType: b.conditionType,
+        conditionValue: b.conditionValue,
+      })),
     };
   }
 
