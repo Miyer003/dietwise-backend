@@ -495,6 +495,7 @@ export class AdminService {
       .addSelect('SUM(log.costCents)', 'cost')
       .addSelect('SUM(log.inputTokens)', 'inputTokens')
       .addSelect('SUM(log.outputTokens)', 'outputTokens')
+      .addSelect('AVG(log.latencyMs)', 'avgLatency')
       .where('log.createdAt >= :start', { start })
       .andWhere('log.createdAt <= :end', { end })
       .andWhere('log.modelName IS NOT NULL')
