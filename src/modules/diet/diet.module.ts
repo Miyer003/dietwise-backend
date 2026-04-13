@@ -6,9 +6,10 @@ import { DietRecord } from './entities/diet-record.entity';
 import { DietRecordItem } from './entities/diet-record-item.entity';
 import { AIModule } from '../../shared/ai/ai.module';
 import { UserModule } from '../user/user.module';
+import { AchievementModule } from '../achievement/achievement.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DietRecord, DietRecordItem]), AIModule, UserModule],
+  imports: [TypeOrmModule.forFeature([DietRecord, DietRecordItem]), AIModule, UserModule, AchievementModule],
   controllers: [DietController],
   providers: [DietService],
   exports: [DietService],

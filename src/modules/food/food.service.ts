@@ -32,16 +32,16 @@ export class FoodService {
     private readonly recordItemRepo: Repository<DietRecordItem>,
   ) {}
 
-  // 按分类获取食物列表
+  // 按分类获取食物列表（仅返回已核验食物）
   async findByCategory(category?: string, limit: number = 50) {
-    const query = this.foodRepo.createQueryBuilder('food');
+    const query = this.foodRepo.createQueryBuilder('food')
+      .where('food.isVerified = :isVerified', { isVerified: true });
 
     if (category) {
-      query.where('food.category = :category', { category });
+      query.andWhere('food.category = :category', { category });
     }
 
     const items = await query
-      .orderBy('food.isVerified', 'DESC')
       .addOrderBy('food.name')
       .limit(limit)
       .getMany();
@@ -59,10 +59,11 @@ export class FoodService {
     }));
   }
 
-  // 搜索食物（中文+拼音模糊搜索）
+  // 搜索食物（中文+拼音模糊搜索，仅返回已核验食物）
   async search(keyword: string, category?: string, limit: number = 20) {
     const query = this.foodRepo.createQueryBuilder('food')
-      .where('food.name ILIKE :keyword OR food.namePinyin ILIKE :keyword', {
+      .where('food.isVerified = :isVerified', { isVerified: true })
+      .andWhere('(food.name ILIKE :keyword OR food.namePinyin ILIKE :keyword)', {
         keyword: `%${keyword}%`,
       });
 
@@ -71,7 +72,6 @@ export class FoodService {
     }
 
     const items = await query
-      .orderBy('food.isVerified', 'DESC')
       .addOrderBy('food.name')
       .limit(limit)
       .getMany();
@@ -89,19 +89,20 @@ export class FoodService {
     }));
   }
 
-  // 获取所有分类
+  // 获取所有分类（仅包含有已核验食物的分类）
   async getCategories() {
     const categories = await this.foodRepo
       .createQueryBuilder('food')
       .select('DISTINCT food.category', 'category')
+      .where('food.isVerified = :isVerified', { isVerified: true })
       .getRawMany();
 
     return categories.map(c => c.category);
   }
 
-  // 获取食物详情
+  // 获取食物详情（仅返回已核验食物）
   async findById(id: string) {
-    const item = await this.foodRepo.findOne({ where: { id } });
+    const item = await this.foodRepo.findOne({ where: { id, isVerified: true } });
     if (!item) {
       throw new NotFoundException('食物不存在');
     }
@@ -258,13 +259,13 @@ export class FoodService {
     return this.search(query, undefined, 10);
   }
 
-  // 根据名字查找食物（模糊匹配）
+  // 根据名字查找食物（模糊匹配，仅返回已核验食物）
   private async findFoodByName(name: string): Promise<FoodItem | null> {
     if (!name) return null;
     
     // 首先尝试精确匹配
     let food = await this.foodRepo.findOne({
-      where: { name },
+      where: { name, isVerified: true },
     });
     
     if (food) return food;
@@ -272,9 +273,9 @@ export class FoodService {
     // 尝试包含匹配（名字包含查询词或查询词包含名字）
     const foods = await this.foodRepo
       .createQueryBuilder('food')
-      .where('food.name ILIKE :name', { name: `%${name}%` })
-      .orWhere(':name ILIKE food.name', { name: `%${name}%` })
-      .orderBy('food.isVerified', 'DESC')
+      .where('food.isVerified = :isVerified', { isVerified: true })
+      .andWhere('(food.name ILIKE :name OR :name ILIKE food.name)', { name: `%${name}%` })
+      .orderBy('food.name')
       .limit(1)
       .getMany();
     

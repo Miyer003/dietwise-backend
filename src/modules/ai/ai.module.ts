@@ -8,6 +8,7 @@ import { UserModule } from '../user/user.module';
 import { MealPlanModule } from '../meal-plan/meal-plan.module';
 import { AIModule as SharedAIModule } from '../../shared/ai/ai.module';
 import { ChatModule } from '../chat/chat.module';
+import { AchievementModule } from '../achievement/achievement.module';
 import { AICallLog } from './entities/ai-call-log.entity';
 
 @Module({
@@ -19,6 +20,7 @@ import { AICallLog } from './entities/ai-call-log.entity';
     UserModule,
     MealPlanModule,
     ChatModule,
+    AchievementModule,
   ],
   controllers: [AIController],
   providers: [AILogService],

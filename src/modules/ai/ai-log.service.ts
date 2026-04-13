@@ -105,6 +105,13 @@ export class AILogService {
     return stats;
   }
 
+  // 获取用户某项功能的成功调用次数
+  async getSuccessCount(userId: string, functionType: AIFunctionType): Promise<number> {
+    return this.logRepo.count({
+      where: { userId, functionType, success: true },
+    });
+  }
+
   // 计算调用成本（单位：分）
   private calculateCost(
     provider?: AIProvider,

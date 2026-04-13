@@ -9,6 +9,7 @@ import { UserService } from '../user/user.service';
 import { MealPlanService } from '../meal-plan/meal-plan.service';
 import { ChatService } from '../chat/chat.service';
 import { AILogService, AIFunctionType, AIProvider } from './ai-log.service';
+import { AchievementService } from '../achievement/achievement.service';
 import { AnalyzeNutritionDto, GenerateTipDto, GenerateMealPlanDto, ChatDto, AnalyzeVoiceDto } from './dto/ai.dto';
 
 @ApiTags('AI服务')
@@ -24,6 +25,7 @@ export class AIController {
     private readonly mealPlanService: MealPlanService,
     private readonly chatService: ChatService,
     private readonly aiLogService: AILogService,
+    private readonly achievementService: AchievementService,
   ) {}
 
   @Post('analyze-nutrition')
@@ -364,6 +366,9 @@ export class AIController {
         success: true,
       });
 
+      // 检查AI咨询成就（异步执行）
+      this.checkChatAchievements(userId).catch(() => {});
+
       return {
         sessionId,
         content: aiResult.content,
@@ -380,6 +385,13 @@ export class AIController {
         errorMessage: error.message,
       });
       throw error;
+    }
+  }
+
+  private async checkChatAchievements(userId: string) {
+    const chatCount = await this.aiLogService.getSuccessCount(userId, AIFunctionType.CHAT);
+    if (chatCount >= 10) {
+      await this.achievementService.unlock(userId, 'chat_enthusiast').catch(() => {});
     }
   }
 

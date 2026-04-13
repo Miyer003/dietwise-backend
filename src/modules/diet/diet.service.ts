@@ -8,6 +8,7 @@ import { AIService } from '../../shared/ai/ai.service';
 import { RedisService } from '../../shared/redis/redis.service';
 import { MinioService } from '../../shared/minio/minio.service';
 import { UserService } from '../user/user.service';
+import { AchievementService } from '../achievement/achievement.service';
 
 @Injectable()
 export class DietService {
@@ -20,6 +21,7 @@ export class DietService {
     private readonly redisService: RedisService,
     private readonly minioService: MinioService,
     private readonly userService: UserService,
+    private readonly achievementService: AchievementService,
   ) {}
 
   // 获取饮食记录列表
@@ -140,6 +142,10 @@ export class DietService {
     // 清除今日摘要缓存
     const today = new Date().toISOString().split('T')[0];
     await this.redisService.del(`diet:daily:${userId}:${today}`);
+
+    // 检查并解锁相关成就（异步执行，不阻塞主流程）
+    const recordDate = saved.recordDate instanceof Date ? saved.recordDate : new Date(saved.recordDate);
+    this.checkRecordAchievements(userId, dto.inputMethod, recordDate, dto.mealType).catch(() => {});
 
     return saved;
   }
@@ -530,5 +536,246 @@ export class DietService {
         hasRecord: true,
       };
     });
+  }
+
+  // 检查饮食记录相关成就
+  private async checkRecordAchievements(userId: string, inputMethod: string, recordDate: Date, mealType: string) {
+    // 初次记录
+    await this.achievementService.unlock(userId, 'first_record').catch(() => {});
+
+    // 拍照大师（拍照识别）
+    if (inputMethod === 'photo') {
+      await this.achievementService.unlock(userId, 'photo_master').catch(() => {});
+    }
+
+    // 记录次数类成就
+    const totalRecords = await this.recordRepo.count({ where: { userId } });
+    if (totalRecords >= 10) {
+      await this.achievementService.unlock(userId, 'record_10').catch(() => {});
+    }
+    if (totalRecords >= 50) {
+      await this.achievementService.unlock(userId, 'record_50').catch(() => {});
+    }
+    if (totalRecords >= 100) {
+      await this.achievementService.unlock(userId, 'record_100').catch(() => {});
+    }
+
+    // 连续记录天数
+    const consecutiveDays = await this.getConsecutiveRecordDays(userId);
+    if (consecutiveDays >= 3) await this.achievementService.unlock(userId, 'streak_3').catch(() => {});
+    if (consecutiveDays >= 7) await this.achievementService.unlock(userId, 'streak_7').catch(() => {});
+    if (consecutiveDays >= 14) await this.achievementService.unlock(userId, 'streak_14').catch(() => {});
+    if (consecutiveDays >= 30) await this.achievementService.unlock(userId, 'streak_30').catch(() => {});
+    if (consecutiveDays >= 100) await this.achievementService.unlock(userId, 'streak_100').catch(() => {});
+
+    // 早起鸟（连续7天在8点前记录早餐）
+    if (mealType === 'breakfast') {
+      const hour = recordDate.getHours();
+      if (hour < 8) {
+        const earlyBirdDays = await this.getConsecutiveEarlyBreakfastDays(userId);
+        if (earlyBirdDays >= 7) {
+          await this.achievementService.unlock(userId, 'early_bird').catch(() => {});
+        }
+      }
+    }
+
+    // 蔬菜爱好者
+    const veggieCount = await this.getTotalVeggieItems(userId);
+    if (veggieCount >= 30) {
+      await this.achievementService.unlock(userId, 'veggie_lover').catch(() => {});
+    }
+
+    // 喝水达人（简化判断：记录中包含液体食物或notes中注明喝水）
+    const waterCount = await this.getTotalWaterRecords(userId);
+    if (waterCount >= 7) {
+      await this.achievementService.unlock(userId, 'water_tracker').catch(() => {});
+    }
+
+    // 均衡饮食类成就（基于每日数据）
+    await this.checkDailyBalanceAchievements(userId);
+  }
+
+  private async getConsecutiveRecordDays(userId: string): Promise<number> {
+    const records = await this.recordRepo
+      .createQueryBuilder('record')
+      .select('DISTINCT DATE(record.recordDate)', 'date')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .orderBy('date', 'DESC')
+      .getRawMany();
+
+    const dates = records.map(r => new Date(r.date).toISOString().split('T')[0]);
+    if (dates.length === 0) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    if (dates[0] !== today && dates[0] !== yesterday) return 0;
+
+    let consecutive = 1;
+    for (let i = 0; i < dates.length - 1; i++) {
+      const current = new Date(dates[i] + 'T00:00:00Z');
+      const next = new Date(dates[i + 1] + 'T00:00:00Z');
+      const diffDays = Math.round((current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        consecutive++;
+      } else {
+        break;
+      }
+    }
+    return consecutive;
+  }
+
+  private async getConsecutiveEarlyBreakfastDays(userId: string): Promise<number> {
+    const records = await this.recordRepo.find({
+      where: { userId, mealType: 'breakfast' as MealType },
+      order: { createdAt: 'DESC' },
+    });
+
+    const dateSet = new Set<string>();
+    for (const record of records) {
+      const hour = new Date(record.createdAt).getHours();
+      if (hour < 8) {
+        dateSet.add(new Date(record.createdAt).toISOString().split('T')[0]);
+      }
+    }
+
+    const dates = Array.from(dateSet).sort().reverse();
+    if (dates.length === 0) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    if (dates[0] !== today && dates[0] !== yesterday) return 0;
+
+    let consecutive = 1;
+    for (let i = 0; i < dates.length - 1; i++) {
+      const current = new Date(dates[i] + 'T00:00:00Z');
+      const next = new Date(dates[i + 1] + 'T00:00:00Z');
+      const diffDays = Math.round((current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        consecutive++;
+      } else {
+        break;
+      }
+    }
+    return consecutive;
+  }
+
+  private async getTotalVeggieItems(userId: string): Promise<number> {
+    const veggieKeywords = ['蔬菜', '青菜', '白菜', '菠菜', '芹菜', '黄瓜', '番茄', '西红柿', '西兰花', '胡萝卜', '生菜', '韭菜', '茄子', '南瓜', '冬瓜', '土豆', '马铃薯', '洋葱', '青椒', '辣椒', '蒜苔', '莴笋', '芦笋', '豆芽', '蘑菇', '木耳', '海带', '菜心', '油麦菜', '茼蒿', '芥蓝', '甘蓝', '卷心菜', '花菜', '菜花', '荷兰豆', '四季豆', '豌豆', '豇豆', '藕', '山药', '红薯', '紫薯', '芋头', '玉米', '秋葵', '丝瓜', '苦瓜', '西葫芦', '瓠子', '佛手瓜', '空心菜', '苋菜', '蕨菜', '香椿', '蒜苗', '小葱', '香菜', '茴香', '荠菜', '马齿苋', '蒲公英', '木耳菜', '茭白', '竹笋', '萝卜', '白萝卜', '青萝卜', '樱桃萝卜', '水萝卜', '榨菜', '雪里蕻', '梅干菜'];
+
+    const items = await this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.record', 'record')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .getMany();
+
+    return items.filter(item =>
+      veggieKeywords.some(keyword => item.foodName.includes(keyword))
+    ).length;
+  }
+
+  private async getTotalWaterRecords(userId: string): Promise<number> {
+    const waterKeywords = ['水', '牛奶', '豆浆', '汤', '咖啡', '茶', '果汁', '奶茶', '可乐', '汽水', '酸奶', '椰汁', '杏仁露', '酸梅汤', '绿豆汤', '银耳汤', '梨汤', '蜂蜜水', '柠檬水'];
+
+    const records = await this.recordRepo
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.items', 'items')
+      .where('record.userId = :userId', { userId })
+      .andWhere('record.deletedAt IS NULL')
+      .getMany();
+
+    let count = 0;
+    for (const record of records) {
+      const hasWaterItem = record.items.some(item =>
+        waterKeywords.some(keyword => item.foodName.includes(keyword))
+      );
+      const hasWaterNote = record.notes && /喝.?水|饮水|喝水/i.test(record.notes);
+      if (hasWaterItem || hasWaterNote) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private async checkDailyBalanceAchievements(userId: string) {
+    const profile = await this.userService.getProfile(userId).catch(() => null);
+    const calorieGoal = profile?.dailyCalorieGoal || 2000;
+    const proteinGoal = profile?.weightKg ? profile.weightKg * 1.2 : 60;
+    const carbsGoal = profile?.dailyCalorieGoal ? (profile.dailyCalorieGoal * 0.5) / 4 : 250;
+    const fatGoal = profile?.dailyCalorieGoal ? (profile.dailyCalorieGoal * 0.3) / 9 : 65;
+
+    // 查询最近90天的所有记录，按日期分组
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+
+    const records = await this.recordRepo.find({
+      where: {
+        userId,
+        recordDate: Between(startDate, new Date()),
+      },
+      relations: ['items'],
+      order: { recordDate: 'DESC' },
+    });
+
+    // 按日期汇总
+    const dailyMap = new Map<string, { calories: number; protein: number; carbs: number; fat: number }>();
+    for (const record of records) {
+      const dateStr = new Date(record.recordDate).toISOString().split('T')[0];
+      if (!dailyMap.has(dateStr)) {
+        dailyMap.set(dateStr, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      }
+      const day = dailyMap.get(dateStr)!;
+      day.calories += Number(record.totalCalories) || 0;
+      day.protein += Number(record.totalProtein) || 0;
+      day.carbs += Number(record.totalCarbs) || 0;
+      day.fat += Number(record.totalFat) || 0;
+    }
+
+    const calorieMet: boolean[] = [];
+    const proteinMet: boolean[] = [];
+    const balancedMet: boolean[] = [];
+    const sugarControlMet: boolean[] = [];
+
+    for (let i = 0; i < 90; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const day = dailyMap.get(dateStr);
+
+      if (!day) break;
+
+      const calorieDeviation = Math.abs(day.calories - calorieGoal) / calorieGoal;
+      const isCaloriePerfect = calorieDeviation <= 0.15;
+      const isProteinOk = day.protein >= proteinGoal * 0.8;
+      const isCarbsOk = day.carbs <= carbsGoal * 1.3 && day.carbs >= carbsGoal * 0.5;
+      const isFatOk = day.fat <= fatGoal * 1.3 && day.fat >= fatGoal * 0.5;
+      const isBalanced = isCaloriePerfect && isProteinOk && isCarbsOk && isFatOk;
+      const isSugarControl = day.carbs <= carbsGoal * 1.1 && calorieDeviation <= 0.2;
+
+      calorieMet.push(isCaloriePerfect);
+      proteinMet.push(isProteinOk);
+      balancedMet.push(isBalanced);
+      sugarControlMet.push(isSugarControl);
+    }
+
+    const caloriePerfectDays = this.getConsecutiveTrueFromStart(calorieMet);
+    const proteinDays = this.getConsecutiveTrueFromStart(proteinMet);
+    const balancedDays = this.getConsecutiveTrueFromStart(balancedMet);
+    const sugarControlDays = this.getConsecutiveTrueFromStart(sugarControlMet);
+
+    if (caloriePerfectDays >= 5) await this.achievementService.unlock(userId, 'calorie_perfect').catch(() => {});
+    if (proteinDays >= 7) await this.achievementService.unlock(userId, 'protein_master').catch(() => {});
+    if (balancedDays >= 3) await this.achievementService.unlock(userId, 'balanced_diet').catch(() => {});
+    if (sugarControlDays >= 7) await this.achievementService.unlock(userId, 'sugar_control').catch(() => {});
+  }
+
+  private getConsecutiveTrueFromStart(arr: boolean[]): number {
+    let count = 0;
+    for (const val of arr) {
+      if (val) count++;
+      else break;
+    }
+    return count;
   }
 }

@@ -74,6 +74,12 @@ export class UserController {
     return this.achievementService.getAll(userId);
   }
 
+  @Get('me/achievements/progress')
+  @ApiOperation({ summary: '获取成就徽章进度' })
+  async getAchievementsProgress(@CurrentUser('userId') userId: string) {
+    return this.achievementService.getProgress(userId);
+  }
+
   @Get('me/achievements/new')
   @ApiOperation({ summary: '获取新解锁成就' })
   async getNewAchievements(@CurrentUser('userId') userId: string) {
