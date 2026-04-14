@@ -9,9 +9,9 @@ export class UpdateUserDto {
   @IsOptional()
   nickname?: string;
 
-  @ApiProperty({ description: '头像Emoji', example: '🥗', required: false })
+  @ApiProperty({ description: '头像Emoji或图标名', example: '🥗', required: false })
   @IsString()
-  @Length(1, 10)
+  @Length(1, 50)
   @IsOptional()
   avatarEmoji?: string;
 

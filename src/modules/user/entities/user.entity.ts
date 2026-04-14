@@ -27,7 +27,7 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 50, default: '膳智用户' })
   nickname: string;
 
-  @Column({ type: 'varchar', length: 10, name: 'avatar_emoji', default: '🥗' })
+  @Column({ type: 'varchar', length: 50, name: 'avatar_emoji', default: '🥗' })
   avatarEmoji: string;
 
   @Column({ type: 'varchar', length: 255, name: 'avatar_url', nullable: true })

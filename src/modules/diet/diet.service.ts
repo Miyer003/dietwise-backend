@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { DietRecord, MealType } from './entities/diet-record.entity';
 import { DietRecordItem } from './entities/diet-record-item.entity';
+import { MealPlan, PlanStatus } from '../meal-plan/entities/meal-plan.entity';
 import { CreateDietRecordDto, UpdateDietRecordDto } from './dto/create-diet-record.dto';
 import { AIService } from '../../shared/ai/ai.service';
 import { RedisService } from '../../shared/redis/redis.service';
@@ -17,6 +18,8 @@ export class DietService {
     private readonly recordRepo: Repository<DietRecord>,
     @InjectRepository(DietRecordItem)
     private readonly itemRepo: Repository<DietRecordItem>,
+    @InjectRepository(MealPlan)
+    private readonly mealPlanRepo: Repository<MealPlan>,
     private readonly aiService: AIService,
     private readonly redisService: RedisService,
     private readonly minioService: MinioService,
@@ -233,9 +236,13 @@ export class DietService {
       .orderBy('record.createdAt', 'ASC')
       .getMany();
 
-    // 获取用户每日目标
+    // 获取用户每日目标：优先从当前激活的食谱获取，否则 fallback 到用户画像
+    const activePlan = await this.mealPlanRepo.findOne({
+      where: { userId, status: PlanStatus.ACTIVE },
+      order: { createdAt: 'DESC' },
+    });
     const profile = await this.userService.getProfile(userId).catch(() => null);
-    const goal = profile?.dailyCalorieGoal || 2000;
+    const goal = activePlan?.calorieTarget ?? profile?.dailyCalorieGoal ?? 2000;
 
     const fiberG = records.reduce((sum, r) => 
       sum + r.items.reduce((itemSum, item) => itemSum + Number(item.fiberG || 0), 0), 0);

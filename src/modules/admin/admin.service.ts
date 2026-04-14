@@ -225,6 +225,7 @@ export class AdminService {
         phone: user.phone,
         nickname: user.nickname,
         avatarEmoji: user.avatarEmoji,
+        avatarUrl: user.avatarUrl,
         role: user.role,
         status: user.status,
         createdAt: formatToBeijingTime(user.createdAt),
@@ -263,6 +264,7 @@ export class AdminService {
       email: user.email,
       nickname: user.nickname,
       avatarEmoji: user.avatarEmoji,
+      avatarUrl: user.avatarUrl,
       role: user.role,
       status: user.status,
       createdAt: formatToBeijingTime(user.createdAt),
@@ -759,7 +761,7 @@ export class AdminService {
     
     const users = await this.userRepo.find({
       where: { id: In(paginatedIds) },
-      select: ['id', 'phone', 'nickname', 'avatarEmoji', 'createdAt', 'lastLoginAt'],
+      select: ['id', 'phone', 'nickname', 'avatarEmoji', 'avatarUrl', 'createdAt', 'lastLoginAt'],
     });
 
     // 构建用户ID到记录数的映射
@@ -773,6 +775,7 @@ export class AdminService {
         phone: user?.phone || '-',
         nickname: user?.nickname || '未知用户',
         avatarEmoji: user?.avatarEmoji || '👤',
+        avatarUrl: user?.avatarUrl,
         createdAt: formatToBeijingTime(user?.createdAt),
         lastLoginAt: formatToBeijingTime(user?.lastLoginAt),
         todayRecords: recordCountMap.get(userId) || 0,

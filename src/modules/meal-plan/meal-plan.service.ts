@@ -287,6 +287,14 @@ export class MealPlanService {
     await this.archiveOtherActive(userId);
     await this.planRepo.update(id, { status: PlanStatus.ACTIVE });
 
+    // 同步更新用户 profile 的每日热量目标和饮食设置
+    await this.userService.updateProfile(userId, {
+      dailyCalorieGoal: plan.calorieTarget,
+      mealCount: plan.mealCount,
+      healthGoal: plan.healthGoal,
+      flavorPrefs: plan.flavorPrefs,
+    });
+
     return this.getById(userId, id);
   }
 
