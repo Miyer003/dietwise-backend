@@ -11,7 +11,7 @@ import { UserModule } from './modules/user/user.module';
 import { DietModule } from './modules/diet/diet.module';
 import { FoodModule } from './modules/food/food.module';
 import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
-import { NotificationModule } from './modules/notification/notification.module';
+
 import { TipsModule } from './modules/tips/tips.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
@@ -50,7 +50,6 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     DietModule,
     FoodModule,
     MealPlanModule,
-    NotificationModule,
     TipsModule,
     ChatModule,
     AchievementModule,

@@ -15,9 +15,7 @@ export class PushSyncDto {
   @IsArray()
   tips: any[];
 
-  @ApiProperty({ description: '提醒设置', required: false })
-  @IsOptional()
-  notificationSettings?: any;
+
 }
 
 export class PullSyncResponseDto {
@@ -29,9 +27,6 @@ export class PullSyncResponseDto {
 
   @ApiProperty({ description: '用户画像' })
   userProfile: any;
-
-  @ApiProperty({ description: '提醒设置' })
-  notificationSettings: any;
 
   @ApiProperty({ description: '成就徽章' })
   achievements: any[];

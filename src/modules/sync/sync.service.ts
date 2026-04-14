@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DietService } from '../diet/diet.service';
 import { MealPlanService } from '../meal-plan/meal-plan.service';
-import { NotificationService } from '../notification/notification.service';
 import { AchievementService } from '../achievement/achievement.service';
 import { PushSyncDto } from './dto/sync.dto';
 
@@ -10,7 +9,6 @@ export class SyncService {
   constructor(
     private readonly dietService: DietService,
     private readonly mealPlanService: MealPlanService,
-    private readonly notificationService: NotificationService,
     private readonly achievementService: AchievementService,
   ) {}
 
@@ -57,16 +55,12 @@ export class SyncService {
     // 获取当前食谱
     const mealPlan = await this.mealPlanService.getActive(userId);
 
-    // 获取提醒设置
-    const notificationSettings = await this.notificationService.getSettings(userId);
-
     // 获取成就
     const achievements = await this.achievementService.getAll(userId);
 
     return {
       dietRecords,
       mealPlans: (mealPlan as any).hasPlan === false ? [] : [mealPlan],
-      notificationSettings,
       achievements: achievements.achievements,
       serverTime: new Date().toISOString(),
     };
