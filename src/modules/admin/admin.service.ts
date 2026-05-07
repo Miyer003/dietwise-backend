@@ -549,7 +549,7 @@ export class AdminService {
       failCalls: parseInt(s.failCalls) || 0,
       successRate: parseInt(s.calls) > 0 
         ? Math.round((parseInt(s.successCalls || 0) / parseInt(s.calls)) * 1000) / 10 
-        : 0,
+        : null,
       avgLatency: Math.round(parseFloat(s.avgLatency || 0)),
     }));
   }
